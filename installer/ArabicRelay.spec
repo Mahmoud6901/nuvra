@@ -18,9 +18,9 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='Arabic Relay',
+    name='Nuvra',
     console=False,
     upx=False,
     icon=os.path.join(ROOT, 'src', 'arabic_relay', 'assets', 'relay.ico'),
 )
-coll = COLLECT(exe, a.binaries, a.datas, upx=False, name='Arabic Relay')
+coll = COLLECT(exe, a.binaries, a.datas, upx=False, name='Nuvra')

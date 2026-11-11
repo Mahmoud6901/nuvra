@@ -19,7 +19,11 @@ class Package(unittest.TestCase):
 
     def test_pip_install_gets_a_window_command(self):
         project = PROJECT['project']
-        self.assertEqual(project['gui-scripts'], {'arabic-relay': 'arabic_relay.__main__:main'})
+        self.assertEqual(project['name'], 'nuvra')
+        self.assertEqual(project['gui-scripts'], {
+            'nuvra': 'arabic_relay.__main__:main',
+            'arabic-relay': 'arabic_relay.__main__:main',
+        })
         self.assertIn('cryptography>=43', project['dependencies'])
         self.assertIn('setuptools>=77', PROJECT['build-system']['requires'])
         self.assertEqual(project['license-files'], ['LICENSE'])

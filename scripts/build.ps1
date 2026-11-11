@@ -1,7 +1,7 @@
-# Builds dist\Arabic Relay\ with PyInstaller, checks it with the frozen --self-test, then builds
+# Builds dist\Nuvra\ with PyInstaller, checks it with the frozen --self-test, then builds
 # dist\ArabicRelay-Setup-<version>.exe with Inno Setup. Used locally and by .github/workflows/release.yml.
 #   -Smoke   silent install into a temp folder, installed --self-test, silent uninstall (reuses an existing setup).
-#            Only where Arabic Relay isn't installed (CI): the smoke uninstall shares the real install's AppId.
+#            Only where Nuvra isn't installed (CI): the smoke uninstall shares the real install's AppId.
 param([switch]$Smoke)
 $ErrorActionPreference = 'Stop'
 Set-Location (Split-Path $PSScriptRoot -Parent)
@@ -28,9 +28,9 @@ function Invoke-SelfTest([string]$exe) {
 if (-not ($Smoke -and (Test-Path $setup))) {
     & $python -m PyInstaller --noconfirm --clean installer\ArabicRelay.spec --distpath dist --workpath build\pyinstaller
     if ($LASTEXITCODE -ne 0) { throw 'PyInstaller failed' }
-    Invoke-SelfTest 'dist\Arabic Relay\Arabic Relay.exe'
-    $megabytes = [math]::Round((Get-ChildItem 'dist\Arabic Relay' -Recurse -File | Measure-Object Length -Sum).Sum / 1MB)
-    "Built Arabic Relay ${version}: $megabytes MB"
+    Invoke-SelfTest 'dist\Nuvra\Nuvra.exe'
+    $megabytes = [math]::Round((Get-ChildItem 'dist\Nuvra' -Recurse -File | Measure-Object Length -Sum).Sum / 1MB)
+    "Built Nuvra ${version}: $megabytes MB"
 
     $bootstrapper = 'build\MicrosoftEdgeWebview2Setup.exe'
     if (-not (Test-Path $bootstrapper)) {
@@ -49,16 +49,16 @@ if (-not ($Smoke -and (Test-Path $setup))) {
 
 if ($Smoke) {
     if (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{B981CB91-79B0-4049-ABF8-C2A11A94560B}_is1') {
-        throw 'Arabic Relay is installed here; the smoke uninstall would remove its shortcut and Apps entry. CI runs -Smoke.'
+        throw 'Nuvra is installed here; the smoke uninstall would remove its shortcut and Apps entry. CI runs -Smoke.'
     }
     $folder = Join-Path $env:TEMP "relay-install-$(Get-Random)"
-    $dir = Join-Path $folder 'Arabic Relay'
+    $dir = Join-Path $folder 'Nuvra'
     $userData = Join-Path $env:LOCALAPPDATA 'Arabic Relay'
     if (-not (Test-Path $userData)) { New-Item -ItemType Directory $userData | Out-Null; Set-Content "$userData\smoke.txt" 'smoke' }
     $before = (Get-ChildItem $userData -Force | ForEach-Object Name) -join '|'
     $run = Start-Process $setup -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', "/DIR=`"$dir`"" -Wait -PassThru
     if ($run.ExitCode -ne 0) { throw "Silent install failed ($($run.ExitCode))" }
-    Invoke-SelfTest "$dir\Arabic Relay.exe"
+    Invoke-SelfTest "$dir\Nuvra.exe"
     $run = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
     if ($run.ExitCode -ne 0) { throw "Silent uninstall failed ($($run.ExitCode))" }
     for ($i = 0; $i -lt 60 -and (Test-Path $dir); $i++) { Start-Sleep 1 }  # the uninstaller finishes from a temp copy

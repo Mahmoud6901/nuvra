@@ -80,7 +80,7 @@ def app_owned(folder):
 
 def delete_model(folder):
     if not app_owned(folder):
-        raise ValueError('Arabic Relay بيمسح النماذج اللي حمّلها بس. امسح الفولدر ده بنفسك لو مش محتاجه.')
+        raise ValueError('Nuvra بيمسح النماذج اللي حمّلها بس. امسح الفولدر ده بنفسك لو مش محتاجه.')
     try:
         shutil.rmtree(folder)
     except OSError:

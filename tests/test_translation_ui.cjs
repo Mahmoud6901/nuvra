@@ -146,7 +146,7 @@ if(require.main===module)(async()=>{
  assert.equal(app.nodes.get('notice').textContent,'Codex اتنقل أو اتمسح: C:\\Tools\\codex.exe. البرنامج هيستخدم أي نسخة يلاقيها، أو اختار مكانه من تبويب النماذج.');
 
  // A model fallback during Prepare is shown.
- app=boot({translate:{english:'Done.',notice:'gpt-old is no longer available, so Arabic Relay switched to the default model.'}});
+ app=boot({translate:{english:'Done.',notice:'gpt-old is no longer available, so Nuvra switched to the default model.'}});
  await flush();n=app.nodes;
  n.get('arabic').value='نص';await n.get('translate').click();await flush();
  assert.equal(n.get('english').value,'Done.');

@@ -280,7 +280,7 @@ class Paster:
         if not isinstance(text, str) or not text.strip() or len(text) > 16000 or '\0' in text:
             raise ValueError('Prepare a prompt between 1 and 16,000 characters before pasting.')
         if target is None:
-            raise ValueError('Click a text field in another app and use Relay’s shortcut to start dictation.')
+            raise ValueError('Click a text field in another app and use Nuvra’s shortcut to start dictation.')
         if not LOCK.acquire(blocking=False):
             raise ValueError('A paste is already in progress. Your prompt is preserved.')
         snapshot, inserted = None, None

@@ -18,7 +18,7 @@ function boot({status={},replies={}}={}){
   fetch:async(url,options)=>{const body=options?.body?JSON.parse(options.body):undefined;requests.push({url,body});let data,ok=true;
    if(url==='/api/status')data={csrf:'t',connected:false,selfLearning:true,autoSpelling:false,speechConfigured:true,setupNeeded:false,
      speechModel:'Whisper large-v3',speechDevice:'GPU',promptChoice:{tool:'codex',model:'',effort:'low'},promptLabel:'Codex · Default · low',
-     missingTools:{},version:'0.1.0',crashed:false,update:{mode:'auto',installOnQuit:true,available:null,ready:null,failed:null,releaseUrl:'https://github.com/Mahmoud6901/arabic-relay/releases'},...status};
+     missingTools:{},version:'0.1.0',crashed:false,update:{mode:'auto',installOnQuit:true,available:null,ready:null,failed:null,releaseUrl:'https://github.com/Mahmoud6901/nuvra/releases'},...status};
    else if(url==='/api/catalog')data={projects:[],live:true};
    else if(url==='/api/vocabulary')data={words:[],corrections:[]};
    else if(url in replies){const reply=replies[url];if(reply.error){ok=false;data={error:reply.error};}else data=reply;}
@@ -36,7 +36,7 @@ function boot({status={},replies={}}={}){
  await flush();
  let n=app.nodes;
  assert.equal(n.get('crashBanner').hidden,true);
- assert.equal(n.get('appVersion').textContent,'Arabic Relay 0.1.0');
+ assert.equal(n.get('appVersion').textContent,'Nuvra 0.1.0');
 
  // Session connection controls have been removed.
  assert.equal(n.has('connectCodex'),false);
@@ -44,14 +44,14 @@ function boot({status={},replies={}}={}){
  assert.equal(app.posted('/api/catalog').length,0);
  assert.equal(app.posted('/api/send').length,0);
  // After a crash: the notice, Copy diagnostics, Dismiss.
- app=boot({status:{crashed:true},replies:{'/api/diagnostics':{text:'Arabic Relay 0.1.0\nGPU: none found'},'/api/crash/dismiss':{crashed:false}}});
+ app=boot({status:{crashed:true},replies:{'/api/diagnostics':{text:'Nuvra 0.1.0\nGPU: none found'},'/api/crash/dismiss':{crashed:false}}});
  await flush();
  n=app.nodes;
  assert.equal(n.get('crashBanner').hidden,false);
  assert.ok(html.includes('<span id="crashText">البرنامج اتقفل فجأة آخر مرة. انسخ معلومات التشخيص وابعتها في GitHub issue.</span>'));
  await n.get('copyCrash').click();await flush();
  assert.equal(app.posted('/api/diagnostics').length,1);
- assert.deepEqual(app.clipboard,['Arabic Relay 0.1.0\nGPU: none found']);
+ assert.deepEqual(app.clipboard,['Nuvra 0.1.0\nGPU: none found']);
  assert.equal(n.get('notice').textContent,'اتنسخت معلومات التشخيص. مفيهاش كلام ولا صوت.');
  await n.get('dismissCrash').click();await flush();
  assert.equal(app.posted('/api/crash/dismiss').length,1);
@@ -63,13 +63,13 @@ function boot({status={},replies={}}={}){
  assert.equal(app.clipboard.length,2);
 
  // Updates: ready → Restart and update installs, then the window quits.
- const url='https://github.com/Mahmoud6901/arabic-relay/releases/tag/v0.2.0';
+ const url='https://github.com/Mahmoud6901/nuvra/releases/tag/v0.2.0';
  const update=extra=>({mode:'auto',installOnQuit:true,available:'0.2.0',ready:null,failed:null,releaseUrl:url,...extra});
  app=boot({status:{update:update({ready:'0.2.0'})},replies:{'/api/update/install':{installing:'0.2.0'}}});
  await flush();
  n=app.nodes;
  assert.equal(n.get('updateBanner').hidden,false);
- assert.equal(n.get('updateText').textContent,'Arabic Relay 0.2.0 جاهز');
+ assert.equal(n.get('updateText').textContent,'Nuvra 0.2.0 جاهز');
  assert.equal(n.get('updateNotes').href,url);
  assert.equal(n.get('updateInstall').textContent,'أعد التشغيل وحدّث');
  assert.equal(n.get('updateInstallItem').hidden,false);
@@ -96,7 +96,7 @@ function boot({status={},replies={}}={}){
  app=boot({status:{update:update({mode:'notify'})}});
  await flush();
  n=app.nodes;
- assert.equal(n.get('updateText').textContent,'Arabic Relay 0.2.0 متاح');
+ assert.equal(n.get('updateText').textContent,'Nuvra 0.2.0 متاح');
  assert.equal(n.get('updateInstallItem').hidden,true);
  assert.equal(n.get('updateNotesItem').hidden,false);
 

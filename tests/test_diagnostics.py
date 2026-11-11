@@ -69,7 +69,7 @@ class Diagnostics(unittest.TestCase):
         gpu = {'name': 'RTX 5070', 'vramGb': 12.0, 'driver': '600.1'}
         with patch.object(models, 'gpu_info', return_value=gpu), patch.object(locate, 'tool_path', return_value=None):
             report = diagnostics.report()
-        for expected in (f'Arabic Relay {__version__}', 'Windows', 'RTX 5070', '600.1', 'Codex: not found', 'Claude Code: not found',
+        for expected in (f'Nuvra {__version__}', 'Windows', 'RTX 5070', '600.1', 'Codex: not found', 'Claude Code: not found',
                          'Wispr Flow: not found', 'Data folder: '):
             self.assertIn(expected, report)
         self.assertNotIn('SECRET-TRANSCRIPT', report)

@@ -5,19 +5,20 @@
 
 [Setup]
 AppId={{B981CB91-79B0-4049-ABF8-C2A11A94560B}
-AppName=Arabic Relay
+AppName=Nuvra
 AppVersion={#AppVersion}
-AppVerName=Arabic Relay {#AppVersion}
+AppVerName=Nuvra {#AppVersion}
 AppPublisher=Mahmoud Adel Hassan
-AppPublisherURL=https://github.com/Mahmoud6901/arabic-relay
-DefaultDirName={autopf}\Arabic Relay
+AppPublisherURL=https://github.com/Mahmoud6901/nuvra
+DefaultDirName={autopf}\Nuvra
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 CloseApplications=yes
 RestartApplications=no
-UninstallDisplayIcon={app}\Arabic Relay.exe
+UninstallDisplayIcon={app}\Nuvra.exe
 SetupIconFile=..\src\arabic_relay\assets\relay.ico
 OutputDir=..\dist
+; Existing clients find this exact asset name when checking for updates.
 OutputBaseFilename=ArabicRelay-Setup-{#AppVersion}
 WizardStyle=modern
 Compression=lzma2
@@ -29,18 +30,24 @@ ArchitecturesInstallIn64BitMode=x64compatible
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "..\dist\Arabic Relay\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\dist\Nuvra\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Upgrade direct executable shortcuts as well as the new Nuvra shortcut.
+Source: "..\dist\Nuvra\Nuvra.exe"; DestDir: "{app}"; DestName: "Arabic Relay.exe"; Flags: ignoreversion; Check: HasLegacyExecutable
 Source: "..\build\MicrosoftEdgeWebview2Setup.exe"; DestDir: "{tmp}"; Flags: deleteafterinstall; Check: NeedsWebView2
 
+[InstallDelete]
+Type: files; Name: "{autoprograms}\Arabic Relay.lnk"
+Type: files; Name: "{autodesktop}\Arabic Relay.lnk"
+
 [Icons]
-Name: "{autoprograms}\Arabic Relay"; Filename: "{app}\Arabic Relay.exe"
-Name: "{autodesktop}\Arabic Relay"; Filename: "{app}\Arabic Relay.exe"; Tasks: desktopicon
+Name: "{autoprograms}\Nuvra"; Filename: "{app}\Nuvra.exe"
+Name: "{autodesktop}\Nuvra"; Filename: "{app}\Nuvra.exe"; Check: CreateDesktopShortcut
 
 [Run]
 Filename: "{tmp}\MicrosoftEdgeWebview2Setup.exe"; Parameters: "/silent /install"; StatusMsg: "Installing Microsoft Edge WebView2..."; Flags: waituntilterminated; Check: NeedsWebView2
-Filename: "{app}\Arabic Relay.exe"; Description: "{cm:LaunchProgram,Arabic Relay}"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\Nuvra.exe"; Description: "{cm:LaunchProgram,Nuvra}"; Flags: nowait postinstall skipifsilent
 ; Restart and update passes /RELAUNCH=1 so a silent update reopens the app.
-Filename: "{app}\Arabic Relay.exe"; Flags: nowait; Check: Relaunch
+Filename: "{app}\Nuvra.exe"; Flags: nowait; Check: Relaunch
 
 [UninstallDelete]
 ; Only our own folder: the user may have picked an existing folder to install into.
@@ -50,6 +57,25 @@ Type: dirifempty; Name: "{app}"
 [Code]
 const
   WebView2Client = 'Microsoft\EdgeUpdate\Clients\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}';
+
+var
+  LegacyDesktopShortcut: Boolean;
+
+function InitializeSetup: Boolean;
+begin
+  LegacyDesktopShortcut := FileExists(ExpandConstant('{autodesktop}\Arabic Relay.lnk'));
+  Result := True;
+end;
+
+function CreateDesktopShortcut: Boolean;
+begin
+  Result := WizardIsTaskSelected('desktopicon') or LegacyDesktopShortcut;
+end;
+
+function HasLegacyExecutable: Boolean;
+begin
+  Result := FileExists(ExpandConstant('{app}\Arabic Relay.exe'));
+end;
 
 function HasWebView2(Root: Integer; Key: String): Boolean;
 var

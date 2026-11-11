@@ -1,6 +1,6 @@
-// Arabic Relay: microphone samples for processing during speech. Runs in an AudioContext created at 16 kHz,
+// Nuvra: microphone samples for processing during speech. Runs in an AudioContext created at 16 kHz,
 // so the browser resamples the microphone; the node is configured for one (downmixed) input channel.
-// Posts signed 16-bit frames of 1,600 samples (100 ms). Audio never leaves the page except to Relay's own server.
+// Posts signed 16-bit frames of 1,600 samples (100 ms). Audio never leaves the page except to Nuvra's own server.
 class RelayPcmCapture extends AudioWorkletProcessor {
   constructor() {
     super();

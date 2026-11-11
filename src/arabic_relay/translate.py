@@ -296,7 +296,7 @@ def codex_text(source, instructions, notices=None, **runtime):
             removed, choice = choice['model'], {**choice, 'model': ''}
             save_choice(choice)
             if notices is not None:
-                notices.append(f'{removed} is no longer available, so Arabic Relay switched to the default model.')
+                notices.append(f'{removed} is no longer available, so Nuvra switched to the default model.')
             english, failure = run_tool(executable, choice, prompt, **runtime)
         if english is None:
             events, stderr = failure

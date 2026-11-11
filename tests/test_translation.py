@@ -170,7 +170,7 @@ class TranslationBoundary(unittest.TestCase):
                 patch.object(translate.subprocess, 'Popen', side_effect=[self.codex_run(gone, code=1), self.codex_run(DRAFT('Done.'))]) as launch:
             result = translate.translate('نص')
         self.assertEqual(result['english'], 'Done.')
-        self.assertEqual(result['notice'], 'gpt-old is no longer available, so Arabic Relay switched to the default model.')
+        self.assertEqual(result['notice'], 'gpt-old is no longer available, so Nuvra switched to the default model.')
         self.assertNotIn('-m', launch.call_args.args[0])
         self.assertEqual(translate.prompt_choice()['model'], '')
         translate.set_prompt_choice('codex', 'gpt-old', 'low')

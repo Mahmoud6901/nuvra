@@ -13,7 +13,7 @@ HF_REPOS = ('models--Systran--faster-whisper-large-v3', 'models--mobiuslabsgmbh-
 APP_MODELS = ('large-v3', 'large-v3-turbo')  # downloaded by the app into paths.DATA/models
 TOOLS = ('codex', 'claude', 'wispr')
 UNINSTALL = r'Software\Microsoft\Windows\CurrentVersion\Uninstall'
-FORMAT_HELP = 'Arabic Relay محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).'
+FORMAT_HELP = 'Nuvra محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).'
 
 
 def validate_model_folder(folder):

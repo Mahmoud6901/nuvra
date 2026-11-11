@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 
 from . import __version__, direct_sessions, firstrun, locate, models, paths, speech, store, t3, translate, paste
 
-REPO = 'Mahmoud6901/arabic-relay'
+REPO = 'Mahmoud6901/nuvra'
 PUBLIC_KEY = 'db597f49194c827e9ef9ec3df3e38d43000e088b576e72b7be8f3b1e43498436'  # Ed25519, raw 32 bytes as hex; the private key never leaves the owner's computer
 API = f'https://api.github.com/repos/{REPO}/releases/latest'
 MODES = ('auto', 'notify', 'off')

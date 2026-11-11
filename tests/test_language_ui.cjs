@@ -55,7 +55,7 @@ const outside=script.replace(/\btr\(\s*(?:'(?:[^'\\\n]|\\.)*'|"(?:[^"\\\n]|\\.)*
 for(const line of outside.split('\n'))if(ARABIC.test(line))missing.push(`script, outside tr(): ${line.trim().slice(0,160)}`);
 
 // 5. Every message the Python side can send has English. Values inside a message become a sample.
-const FORMAT_HELP='Arabic Relay محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).';
+const FORMAT_HELP='Nuvra محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).';
 const NOT_MESSAGES=/^(ARTICLES|LETTERS|FOLD|ARABIC_FOLD|ARABIC_PUNCTUATION|EXAMPLES)\b/;
 const IS_MESSAGE=/raise ValueError\(|^[A-Z_]+ = |self\.error = |\breturn\b|say\(error=|^\s*"[^"]*[؀-ۿ]/;
 for(const file of fs.readdirSync(root).filter(name=>name.endsWith('.py'))){

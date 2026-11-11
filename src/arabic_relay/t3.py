@@ -89,7 +89,7 @@ def rpc(method, params=None, initialize=True):
             result, headers = request_json(T3 + '/mcp', {
                 'jsonrpc': '2.0', 'id': secrets.randbelow(100000000), 'method': 'initialize',
                 'params': {'protocolVersion': '2025-06-18', 'capabilities': {},
-                           'clientInfo': {'name': 'Arabic Relay', 'version': '1.0.0'}}},
+                           'clientInfo': {'name': 'Nuvra', 'version': '1.0.0'}}},
                 {'Authorization': 'Bearer ' + access_token()})
             if not result or 'error' in result:
                 raise ValueError('T3 could not initialize the connection.')
@@ -207,7 +207,7 @@ def send_prompt(body):
     """One click dispatches the current prompt, with stable retry deduplication."""
     request_id = body.get('requestId')
     if not isinstance(request_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{20,100}', request_id):
-        raise ValueError('Invalid send request. Refresh Relay and try again.')
+        raise ValueError('Invalid send request. Refresh Nuvra and try again.')
     payload = normalize_payload(body)
     with SEND_LOCK:
         with store.database() as db:

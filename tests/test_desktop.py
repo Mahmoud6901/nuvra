@@ -18,7 +18,7 @@ class DesktopLifecycle(unittest.TestCase):
             instance = json.loads((Path(folder) / 'instance.json').read_text(encoding='utf-8'))
         bind.assert_called_once_with(desktop.server.PORT)
         self.assertEqual(instance, {'pid': os.getpid(), 'port': 8791})
-        self.assertEqual(create.call_args.args, ('Arabic Relay', desktop.server.ORIGIN))
+        self.assertEqual(create.call_args.args, ('Nuvra', desktop.server.ORIGIN))
         self.assertEqual(start.call_args.kwargs['gui'], 'edgechromium')
         self.assertFalse(start.call_args.kwargs['private_mode'])
         httpd.shutdown.assert_called_once()

@@ -74,7 +74,7 @@ def tool_line(name, kind, version=True):
 def report():
     gpu = models.gpu_info()
     voice = speech.status()
-    lines = [f"Arabic Relay {__version__} ({'installed' if getattr(sys, 'frozen', False) else 'source'})",
+    lines = [f"Nuvra {__version__} ({'installed' if getattr(sys, 'frozen', False) else 'source'})",
              f'Windows {platform.version()} ({platform.machine()})', f'Python {platform.python_version()}',
              f"GPU: {gpu['name']}, {gpu['vramGb']} GB, driver {gpu['driver']}" if gpu else 'GPU: none found',
              f"Speech: {voice['speechDevice']} · {voice['speechModel'] or 'no model'} · {voice['modelPath'] or 'not set'}",

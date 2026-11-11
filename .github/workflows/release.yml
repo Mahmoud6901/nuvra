@@ -69,5 +69,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
-          gh release create "$GITHUB_REF_NAME" --draft --title "Arabic Relay $version" --generate-notes \
+          gh release create "$GITHUB_REF_NAME" --draft --title "Nuvra $version" --generate-notes \
             "dist/ArabicRelay-Setup-$version.exe" dist/SHA256SUMS.txt

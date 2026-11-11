@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in Arabic Relay doesn't work as expected.
+description: Something in Nuvra doesn't work as expected.
 labels: [bug]
 body:
   - type: textarea

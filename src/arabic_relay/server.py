@@ -1,4 +1,4 @@
-"""Arabic Relay: local prompt preparation and explicit one-click dispatch."""
+"""Nuvra: local prompt preparation and explicit one-click dispatch."""
 import base64
 import hashlib
 import json
@@ -125,7 +125,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.started = time.monotonic()
         if not self.valid_host() or self.headers.get('Origin') != ORIGIN or self.headers.get('X-Relay-Token') != CSRF:
-            return self.respond({'error': 'Request must originate from this Relay page.'}, 403)
+            return self.respond({'error': 'Request must originate from this Nuvra page.'}, 403)
         try:
             size = int(self.headers.get('Content-Length', 0))
             if self.path == '/api/transcribe':
@@ -280,9 +280,9 @@ def main(open_browser=False):
             if 'csrf' not in json.load(response):
                 raise ValueError(f'Port {PORT} is being used by another app.')
         webbrowser.open(ORIGIN)
-        print('Arabic Relay is already running.', flush=True)
+        print('Nuvra is already running.', flush=True)
         sys.exit(0)
-    print('Arabic Relay · Local: ' + ORIGIN, flush=True)
+    print('Nuvra · Local: ' + ORIGIN, flush=True)
     if open_browser:
         webbrowser.open(ORIGIN)
     server.serve_forever()

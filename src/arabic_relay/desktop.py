@@ -123,7 +123,7 @@ class QuickCapture:
                 self.stage = 'capture'
                 width, height = PILL['capture']
                 self.window = webview.create_window(
-                    'Arabic Relay', server.ORIGIN + '/?quick=1',
+                    'Nuvra', server.ORIGIN + '/?quick=1',
                     js_api=DesktopApi(self, quick=True), width=width + FRAME, height=height + FRAME,
                     x=int(screen.x / scale) + (screen_width - width) // 2,
                     y=int(screen.y / scale) + screen_height - height - 70,
@@ -367,7 +367,7 @@ def run():
     capture = QuickCapture(store.get_setting('capture_shortcut', 'ctrl-alt-space'))
     try:
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
-        window = webview.create_window('Arabic Relay', server.ORIGIN, js_api=DesktopApi(capture),
+        window = webview.create_window('Nuvra', server.ORIGIN, js_api=DesktopApi(capture),
                              width=900, height=680, min_size=(640, 520),
                              background_color='#08090a', text_select=True)
         window.events.closed += capture.stop
@@ -419,7 +419,7 @@ def focus_window(pid):
         if owner.value == pid and user32.IsWindowVisible(ctypes.c_void_p(hwnd)):
             title = ctypes.create_unicode_buffer(64)
             user32.GetWindowTextW(ctypes.c_void_p(hwnd), title, 64)
-            if title.value == 'Arabic Relay':
+            if title.value in ('Nuvra', 'Arabic Relay'):
                 found.append(hwnd)
                 return False
         return True
@@ -452,5 +452,5 @@ def main():
     except Exception as error:
         logging.exception('Desktop startup failed')
         diagnostics.record_crash(traceback.format_exc())
-        ctypes.windll.user32.MessageBoxW(None, str(error), 'Arabic Relay', 0x10)
+        ctypes.windll.user32.MessageBoxW(None, str(error), 'Nuvra', 0x10)
         sys.exit(1)

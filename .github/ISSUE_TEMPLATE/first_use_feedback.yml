@@ -5,12 +5,12 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for trying Arabic Relay. This report is public: do not include private prompts, recordings, session titles, account details, or API keys.
+        Thanks for trying Nuvra. This report is public: do not include private prompts, recordings, session titles, account details, or API keys.
         تقدر تكتب بالعربي أو الإنجليزي. التقرير عام؛ بلاش بيانات خاصة أو تسجيلات أو مفاتيح وصول.
   - type: input
     id: version
     attributes:
-      label: Relay version / إصدار التطبيق
+      label: Nuvra version / إصدار التطبيق
       description: Find it in Settings → About.
       placeholder: "0.3.0"
     validations:

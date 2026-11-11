@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="/icon.png"><title>Arabic Relay</title>
+<html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="icon" href="/icon.png"><title>Nuvra</title>
 <script>
 try{document.documentElement.dataset.theme=localStorage.getItem('relay-theme')==='light'?'light':'dark';}catch{document.documentElement.dataset.theme='dark';}
 document.documentElement.dataset.quick=String(window.location?.search==='?quick=1');
@@ -220,8 +220,8 @@ const RELAY_EN={
  "مش مسجّل الدخول. افتح الطرفية واكتب claude وبعدها /login.":"Not signed in. Open a terminal, run claude, then /login.",
  "اتحفظ مكان {tool}.":"{tool}'s location saved.",
  "التحديث لـ {version} ما اتثبتش.":"The update to {version} didn't install.",
- "Arabic Relay {version} جاهز":"Arabic Relay {version} is ready",
- "Arabic Relay {version} متاح":"Arabic Relay {version} is available",
+ "Nuvra {version} جاهز":"Nuvra {version} is ready",
+ "Nuvra {version} متاح":"Nuvra {version} is available",
  "بثبّت التحديث، والبرنامج هيفتح تاني لما يخلص.":"Installing the update. The app will reopen when it finishes.",
  "اتنسخت معلومات التشخيص. مفيهاش كلام ولا صوت.":"Diagnostics copied. They contain no speech or audio.",
  "بيسيب الإنجليزي زي ما هو ويترجم العبارات العربي بس. ":"Keeps your English as it is and translates only the Arabic phrases. ",
@@ -262,13 +262,13 @@ const RELAY_EN={
  "Ollama مش شغال. شغّله أو ثبّته من ollama.com/download وجرّب تاني.":"Ollama isn't running. Start it, or install it from ollama.com/download, and try again.",
  "تحميل النموذج فشل. راجع النت وجرّب تاني.":"The model download failed. Check your connection and try again.",
  "اختار الترجمة تبقى على جهازك ولا لأ.":"Choose whether translation runs on this computer.",
- "Arabic Relay محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).":"Arabic Relay needs a faster-whisper copy (Systran/faster-whisper-large-v3).",
- "ده نموذج OpenAI Whisper بصيغة pt. Arabic Relay محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).":"This is an OpenAI Whisper model in pt format. Arabic Relay needs a faster-whisper copy (Systran/faster-whisper-large-v3).",
- "ده نموذج whisper.cpp. Arabic Relay محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).":"This is a whisper.cpp model. Arabic Relay needs a faster-whisper copy (Systran/faster-whisper-large-v3).",
+ "Nuvra محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).":"Nuvra needs a faster-whisper copy (Systran/faster-whisper-large-v3).",
+ "ده نموذج OpenAI Whisper بصيغة pt. Nuvra محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).":"This is an OpenAI Whisper model in pt format. Nuvra needs a faster-whisper copy (Systran/faster-whisper-large-v3).",
+ "ده نموذج whisper.cpp. Nuvra محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).":"This is a whisper.cpp model. Nuvra needs a faster-whisper copy (Systran/faster-whisper-large-v3).",
  "الفولدر ده مش نموذج faster-whisper. اختار الفولدر اللي فيه model.bin و config.json.":"This folder isn't a faster-whisper model. Choose the folder with model.bin and config.json.",
  "اختار Codex أو Claude Code أو Wispr Flow.":"Choose Codex, Claude Code or Wispr Flow.",
  "اختار ملف البرنامج بصيغة exe.":"Choose the program file (exe).",
- "Arabic Relay بيمسح النماذج اللي حمّلها بس. امسح الفولدر ده بنفسك لو مش محتاجه.":"Arabic Relay only deletes models it downloaded. Delete this folder yourself if you no longer need it.",
+ "Nuvra بيمسح النماذج اللي حمّلها بس. امسح الفولدر ده بنفسك لو مش محتاجه.":"Nuvra only deletes models it downloaded. Delete this folder yourself if you no longer need it.",
  "ملفات النموذج مستخدمة دلوقتي. جرّب تاني بعد شوية.":"The model files are in use. Try again shortly.",
  "الملف اتحمّل بايظ. جرّب تاني.":"The file downloaded corrupted. Try again.",
  "التحميل وقف. راجع النت وجرّب تاني، وهيكمل من مكانه.":"The download stopped. Check your connection and try again. It will continue where it stopped.",
@@ -530,7 +530,7 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
 <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5 19 19M5 19l1.5-1.5M17.5 6.5 19 5"/></symbol>
 <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></symbol></defs></svg>
 <div id="app">
- <header class="topbar"><div class="brand" dir="ltr">Arabic Relay</div><div class="tabs" id="tabs" role="tablist" aria-label="أقسام البرنامج"><button class="tab" role="tab" id="historyButton" aria-controls="historyPanel" aria-selected="true">السجل</button><button class="tab" role="tab" id="modelsButton" aria-controls="modelsPanel" aria-selected="false" tabindex="-1">النماذج</button><button class="tab" role="tab" id="settingsButton" aria-controls="settingsPanel" aria-selected="false" tabindex="-1">الإعدادات</button></div><div class="top-key" id="topKey" hidden><span>اختصار التسجيل</span><kbd class="keycap mono" id="topShortcut" dir="ltr">Ctrl + Alt + Space</kbd></div></header>
+ <header class="topbar"><div class="brand" dir="ltr">Nuvra</div><div class="tabs" id="tabs" role="tablist" aria-label="أقسام البرنامج"><button class="tab" role="tab" id="historyButton" aria-controls="historyPanel" aria-selected="true">السجل</button><button class="tab" role="tab" id="modelsButton" aria-controls="modelsPanel" aria-selected="false" tabindex="-1">النماذج</button><button class="tab" role="tab" id="settingsButton" aria-controls="settingsPanel" aria-selected="false" tabindex="-1">الإعدادات</button></div><div class="top-key" id="topKey" hidden><span>اختصار التسجيل</span><kbd class="keycap mono" id="topShortcut" dir="ltr">Ctrl + Alt + Space</kbd></div></header>
  <div class="panels">
  <section class="panel" id="historyPanel" role="tabpanel" aria-labelledby="historyButton"><div class="column">
   <p class="panel-intro">آخر 10 نص. نص بس، محفوظ على جهازك.</p>
@@ -569,7 +569,7 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
   <section class="group"><h2>طريقة الكتابة</h2><div class="mode-buttons" role="group" aria-label="طريقة الكتابة"><button class="btn" id="craftMode" aria-pressed="true">برومبت منظّم</button><button class="btn" id="inlineMode" aria-pressed="false">ترجمة العربي بس</button></div><p class="group-help" id="modeHelp"></p></section>
   <section class="group" id="shortcutSettings" hidden><h2>الاختصار</h2><div class="setting"><label for="shortcutChoice">اختصار التسجيل</label><select id="shortcutChoice" dir="ltr"><option value="ctrl-alt-space">Ctrl + Alt + Space</option><option value="ctrl-alt-r">Ctrl + Alt + R</option><option value="ctrl-shift-space">Ctrl + Shift + Space</option></select></div><p class="group-help" id="shortcutHelp" role="status">سيب البرنامج مفتوح أو متصغّر. الاختصار بيبدأ التسجيل وبيوقفه.</p><p class="group-help" id="shortcutStatus" hidden></p><p class="group-help">أثناء التسجيل: Enter لإنهاء التسجيل واللصق، وEsc للإلغاء.</p></section>
   <section class="group"><h2>الشكل</h2><button class="btn" id="themeToggle" aria-label="غيّر للوضع الفاتح"><svg aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><span>الوضع الفاتح</span></button></section>
-  <section class="group" id="aboutSettings"><h2>التحديثات</h2><p id="appVersion">Arabic Relay</p><div class="setting"><label for="updateMode">طريقة التحديث</label><select id="updateMode"><option value="auto">تلقائي</option><option value="notify">تنبيه بس</option><option value="off">إيقاف</option></select></div><label class="choice"><input id="installOnQuit" type="checkbox" checked>ثبّت التحديثات لما أقفل البرنامج</label></section>
+  <section class="group" id="aboutSettings"><h2>التحديثات</h2><p id="appVersion">Nuvra</p><div class="setting"><label for="updateMode">طريقة التحديث</label><select id="updateMode"><option value="auto">تلقائي</option><option value="notify">تنبيه بس</option><option value="off">إيقاف</option></select></div><label class="choice"><input id="installOnQuit" type="checkbox" checked>ثبّت التحديثات لما أقفل البرنامج</label></section>
   <details class="group" id="advancedSettings"><summary>متقدم</summary>
    <div class="setting-block" id="incrementalSettings"><label class="choice"><input id="incrementalDictation" type="checkbox" disabled aria-describedby="incrementalHelp">حوّل الكلام وأنا بتكلم</label><p class="group-help" id="incrementalHelp">مع Whisper بس. النص بيخلص أسرع بعد ما توقف. شغال تلقائي مع كارت NVIDIA، ومقفول على المعالج لأن النماذج الكبيرة مش بتلحق. الصوت بيفضل في الذاكرة على جهازك.</p></div>
    <div class="setting-block" id="engineSettings"><div class="setting"><label for="engineIdle">سيب نموذج الكلام في الذاكرة</label><select id="engineIdle" aria-describedby="engineHelp"><option value="300">5 دقايق بعد آخر تسجيل</option><option value="900">15 دقيقة</option><option value="3600">ساعة</option><option value="0">لحد ما أقفل البرنامج</option></select></div><label class="choice"><input id="enginePrewarm" type="checkbox">جهّز النموذج أول ما البرنامج يفتح</label><label class="choice"><input id="cpuOnly" type="checkbox">استخدم المعالج دايمًا</label><p class="group-help" id="engineHelp">لما النموذج يخرج من الذاكرة، أول تسجيل بعدها بياخد كام ثانية زيادة.</p><p class="group-help" id="gpuBackoff" role="status" hidden></p><button class="btn" id="retryGpu" hidden>جرّب كارت الشاشة تاني</button></div>
@@ -671,17 +671,17 @@ function update(){
  for(const id of ['refresh','clearDraft','vocabulary','viewVocabulary','forgetVocabulary','example','arabic','english'])$(id).disabled=blocked;
  $('refresh').disabled=blocked||refreshing;$('record').disabled=busy||!csrf;$('retryAudio').disabled=blocked||dictationProvider==='wispr';
  $('send').hidden=!quickCapture;$('send').innerHTML=(sent?'Paste requested':pastePending?'Pasting…':'Paste into app')+' '+icon(sent?'check':'arrow');
- $('send').title=!captureId?'Start from another app’s text field using Relay’s shortcut.':'Paste the displayed prompt into the app where this recording started. Enter is never pressed.';
+ $('send').title=!captureId?'Start from another app’s text field using Nuvra’s shortcut.':'Paste the displayed prompt into the app where this recording started. Enter is never pressed.';
  $('draftBadge').textContent=english?'READY':'DRAFT';$('draftBadge').classList.toggle('ready',!!english);
   updateInline();const next=nextAction();document.documentElement.dataset.next=next;updateSteps(next);updateQuickSurface();maybeAutoPaste();
 }
-// The steps follow the lit control. While Relay is working, the current step holds.
+// The steps follow the lit control. While Nuvra is working, the current step holds.
 function updateSteps(next){
  const reviewing=!next&&!busy&&inlineMode()&&$('english').value.trim();
  const step=sent?3:reviewing?2:{record:1,focus:1,stop:1,prepare:2,retry:2,copy:3,paste:3}[next];if(!step)return;
  for(const n of [1,2,3])$('step'+n).classList.toggle('active',n===step);
 }
-// The one lit control: what the user does next. Nothing is lit while Relay is working.
+// The one lit control: what the user does next. Nothing is lit while Nuvra is working.
 function nextAction(){
  if(listening)return 'stop';
  if(busy||sent||quickTimer||quickComposing||inlinePendingId||inlineTimer||inlineComposing)return '';
@@ -711,7 +711,7 @@ async function loadLocalTranslator(){try{localTranslatorState=await api('/api/lo
 async function refresh(){
  if(busy||refreshing)return;refreshing=true;update();loadLocalTranslator();
  try{
- const status=await api('/api/status');csrf=status.csrf;nativeDesktop=!!status.nativeDesktop;speechConfigured=!!status.speechConfigured;$('pickModel').hidden=!nativeDesktop;speechModel=status.speechModel||null;speechDevice=status.speechDevice||'GPU';missingModel=status.missingModel||null;$('cpuOnly').checked=!!status.cpuOnly;wisprFlowInstalled=!!status.wisprFlowInstalled;cohereConfigured=!!status.cohereConfigured;selfLearningEnabled=status.selfLearning!==false;autoSpellingEnabled=status.autoSpelling===true;incrementalEnabled=status.incrementalDictation===true;engineSettings=status.engineSettings||engineSettings;promptChoice=status.promptChoice||promptChoice;$('promptChoiceLabel').textContent=status.promptLabel||'';missingTools=status.missingTools||{};$('appVersion').textContent='Arabic Relay '+(status.version||'');$('crashBanner').hidden=!status.crashed;renderUpdate(status.update);updateSpeechStatus();setupPending=!!status.setupNeeded;if(status.setupNeeded&&!setupOffered&&!quickCapture){setupOffered=true;selectTab('models');}
+ const status=await api('/api/status');csrf=status.csrf;nativeDesktop=!!status.nativeDesktop;speechConfigured=!!status.speechConfigured;$('pickModel').hidden=!nativeDesktop;speechModel=status.speechModel||null;speechDevice=status.speechDevice||'GPU';missingModel=status.missingModel||null;$('cpuOnly').checked=!!status.cpuOnly;wisprFlowInstalled=!!status.wisprFlowInstalled;cohereConfigured=!!status.cohereConfigured;selfLearningEnabled=status.selfLearning!==false;autoSpellingEnabled=status.autoSpelling===true;incrementalEnabled=status.incrementalDictation===true;engineSettings=status.engineSettings||engineSettings;promptChoice=status.promptChoice||promptChoice;$('promptChoiceLabel').textContent=status.promptLabel||'';missingTools=status.missingTools||{};$('appVersion').textContent='Nuvra '+(status.version||'');$('crashBanner').hidden=!status.crashed;renderUpdate(status.update);updateSpeechStatus();setupPending=!!status.setupNeeded;if(status.setupNeeded&&!setupOffered&&!quickCapture){setupOffered=true;selectTab('models');}
  update();resolveStartup();
  await api('/api/vocabulary').then(showVocabulary).catch(()=>{});
  await api('/api/aliases').then(showAliases).catch(()=>{});
@@ -1157,7 +1157,7 @@ async function locateTool(kind){try{const path=await window.pywebview.api.pick_f
 $('codexBrowse').addEventListener('click',()=>locateTool('codex'));$('claudeBrowse').addEventListener('click',()=>locateTool('claude'));$('wisprLocate').addEventListener('click',()=>locateTool('wispr'));
 function renderUpdate(u){if(!u)return;$('updateMode').value=u.mode;$('installOnQuit').checked=!!u.installOnQuit;const version=u.failed||u.ready||u.available;$('updateBanner').hidden=!version;if(!version)return;
  $('updateNotes').href=$('updateManual').href=u.releaseUrl;$('updateNotesItem').hidden=!!u.failed;$('updateManualItem').hidden=!u.failed;$('updateInstallItem').hidden=!(u.failed||u.ready);
- $('updateInstall').textContent=u.failed?tr('جرّب تاني'):tr('أعد التشغيل وحدّث');$('updateText').textContent=u.failed?tr('التحديث لـ {version} ما اتثبتش.',{version:u.failed}):u.ready?tr('Arabic Relay {version} جاهز',{version:u.ready}):tr('Arabic Relay {version} متاح',{version:u.available});}
+ $('updateInstall').textContent=u.failed?tr('جرّب تاني'):tr('أعد التشغيل وحدّث');$('updateText').textContent=u.failed?tr('التحديث لـ {version} ما اتثبتش.',{version:u.failed}):u.ready?tr('Nuvra {version} جاهز',{version:u.ready}):tr('Nuvra {version} متاح',{version:u.available});}
 $('updateInstall').addEventListener('click',async()=>{if(busy||listening)return;try{await api('/api/update/install',{});notice(tr('بثبّت التحديث، والبرنامج هيفتح تاني لما يخلص.'),true);await window.pywebview?.api?.quit(csrf);}catch(e){notice(e.message);}});
 async function saveUpdatePreferences(){try{renderUpdate(await api('/api/update/preferences',{mode:$('updateMode').value,installOnQuit:$('installOnQuit').checked}));}catch(e){notice(e.message);}}
 $('updateMode').addEventListener('change',saveUpdatePreferences);$('installOnQuit').addEventListener('change',saveUpdatePreferences);

@@ -253,14 +253,14 @@ def send(target, text):
     if not entry:
         raise ValueError('Claude session disconnected. Reopen it and refresh.')
     lines = [{'type': 'auth', 'token': entry['token']}, {'type': 'user', 'uuid': message_id,
-             'from': 'Arabic Relay', 'message': {'role': 'user', 'content': text}}]
+             'from': 'Nuvra', 'message': {'role': 'user', 'content': text}}]
     write_pipe(entry['socket'], ''.join(json.dumps(x, ensure_ascii=False) + '\n' for x in lines).encode('utf-8'))
     deadline = time.monotonic() + 20
     while time.monotonic() < deadline:
         if transcript_has(entry['transcript'], message_id):
             return {'delivery': 'direct_submit', 'messageId': message_id, 'note': 'Claude recorded the prompt in the selected session.'}
         time.sleep(.25)
-    raise ValueError('The prompt was written to Claude’s local connection, but acceptance is not yet confirmed. It may be held or waiting for the current task. Check Claude; Relay will not retry automatically.')
+    raise ValueError('The prompt was written to Claude’s local connection, but acceptance is not yet confirmed. It may be held or waiting for the current task. Check Claude; Nuvra will not retry automatically.')
 
 
 def settings_path():
@@ -292,7 +292,7 @@ def connect_claude():
     if not isinstance(data, dict) or not isinstance(data.get('hooks', {}), dict):
         raise ValueError('Claude settings are not valid. Repair settings.json before connecting.')
     if data.get('disableAllHooks') is True:
-        raise ValueError('Claude hooks are disabled in your settings. Enable them in Claude before connecting Relay.')
+        raise ValueError('Claude hooks are disabled in your settings. Enable them in Claude before connecting Nuvra.')
     command = hook_command()
     hooks = data.setdefault('hooks', {})
     for event in ('SessionStart', 'UserPromptSubmit', 'SessionEnd'):
@@ -306,7 +306,7 @@ def connect_claude():
     temp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
     temp.replace(config)
     CACHE = None
-    return {'message': 'Claude Code connected. Reopen existing sessions, or submit your next prompt there, then refresh Relay.'}
+    return {'message': 'Claude Code connected. Reopen existing sessions, or submit your next prompt there, then refresh Nuvra.'}
 
 
 def connect_codex():

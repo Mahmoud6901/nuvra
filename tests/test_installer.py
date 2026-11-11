@@ -25,7 +25,7 @@ class Installer(unittest.TestCase):
         # Release documentation is local-only. Check the executable guard before the install instead.
         guard = re.search(
             r"if \(Test-Path 'HKCU:[^']*\{B981CB91-79B0-4049-ABF8-C2A11A94560B\}_is1'\) \{\s*"
-            r"throw 'Arabic Relay is installed here;[^']*'\s*\}", smoke)
+            r"throw 'Nuvra is installed here;[^']*'\s*\}", smoke)
         self.assertIsNotNone(guard)
         self.assertLess(guard.end(), smoke.index('Start-Process $setup'))
 
