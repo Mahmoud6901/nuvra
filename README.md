@@ -4,9 +4,11 @@ Speak Arabic and English. Paste clear English text into the app where you are wo
 
 Nuvra is an open-source dictation app for Windows, with experimental macOS builds. Start recording with a keyboard shortcut, speak naturally, and finish to paste the result into your active text field.
 
-[Website](https://mahmoud6901.github.io/nuvra/) · [Download for Windows](https://github.com/Mahmoud6901/nuvra/releases/latest) · [Report a problem](https://github.com/Mahmoud6901/nuvra/issues/new?template=bug_report.yml)
+[Website](https://mahmoud6901.github.io/nuvra/) · [Download for Windows](https://github.com/Mahmoud6901/nuvra/releases/latest) · [macOS preview](#macos-experimental) · [Report a problem](https://github.com/Mahmoud6901/nuvra/issues/new?template=bug_report.yml)
 
 ## Install and get started
+
+### Windows
 
 1. Download the Windows installer from the [website](https://mahmoud6901.github.io/nuvra/#download) and run it. New builds are named `Nuvra-Setup-<version>.exe`. Installation is per user.
 2. Open Nuvra and choose a speech model in **Models**. Local Whisper models download from this tab. Cohere and Wispr Flow are also available.
@@ -18,15 +20,19 @@ Nuvra requires Windows 10 or 11, 64-bit, and Microsoft Edge WebView2. The instal
 
 ### macOS (experimental)
 
-macOS 15 or newer is required. Download `Nuvra-<version>-macos-arm64.dmg` for Apple Silicon or `Nuvra-<version>-macos-x86_64.dmg` for Intel from the release assets. Open the DMG and drag **Nuvra** into **Applications**. ZIP archives of the same app are also available. Verify downloads against the matching `SHA256SUMS-macos-<architecture>.txt` file.
+macOS 15 or newer is required. Download the Mac preview from the [website](https://mahmoud6901.github.io/nuvra/#macos-download) or the [release assets](https://github.com/Mahmoud6901/nuvra/releases/latest). If a release has no Mac assets, use the artifacts from a successful [macOS builds workflow](https://github.com/Mahmoud6901/nuvra/actions/workflows/macos.yml?query=branch%3Amain+is%3Asuccess) or [build from source](#build-macos-release-assets). Downloading workflow artifacts requires a GitHub sign-in.
+
+Download `Nuvra-<version>-macos-arm64.dmg` for Apple Silicon or `Nuvra-<version>-macos-x86_64.dmg` for Intel from the release assets. Open the DMG and drag **Nuvra** into **Applications**. ZIP archives of the same app are also available. Verify downloads against the matching `SHA256SUMS-macos-<architecture>.txt` file.
 
 These builds have an ad-hoc signature, not an Apple Developer ID signature or notarization. macOS may block the first launch. After attempting to open the app, use **System Settings → Privacy & Security → Open Anyway** if you trust the download. This does not require disabling Gatekeeper.
 
-Allow microphone access when prompted. For global shortcuts and automatic paste, enable **Nuvra** under **System Settings → Privacy & Security → Accessibility**, then quit and reopen it. If the shortcut status also requests **Input Monitoring**, enable that permission and restart. The default shortcut is **Control + Option + Space**. Plain **Return** finishes recording and **Escape** cancels while the recording pill is open.
+Allow microphone access when prompted. For global shortcuts and automatic paste, enable **Nuvra** under **System Settings → Privacy & Security → Accessibility** (called **Device Control and Data Access** on some macOS versions), then quit and reopen it. If the shortcut status also requests **Input Monitoring**, enable that permission and restart.
+
+Choose your speech model, prompt provider, and writing mode as described above. Keep Nuvra running and click in the destination text field before recording. The default shortcut is **Control + Option + Space**. Press it again or press plain **Return** to finish recording; **Escape** cancels while the recording pill is open.
 
 Local Whisper runs on the CPU on macOS; Metal and CUDA acceleration are not included. Automatic paste requires the destination app to expose its focused text field through Accessibility. If it cannot verify that field, Nuvra preserves the text for manual copying. macOS updates are notification-only: download the new DMG, quit Nuvra, and replace the app in Applications.
 
-macOS stores settings and history in `~/Library/Application Support/Nuvra`. The `ARABIC_RELAY_DATA_DIR` override also works on macOS. Codex and Claude Code are discovered on `PATH`, in `~/.local/bin`, and in the usual Homebrew directories. Wispr Flow is detected in `/Applications` or `~/Applications`.
+Codex and Claude Code are discovered on `PATH`, in `~/.local/bin`, and in the usual Homebrew directories. Wispr Flow is detected in `/Applications` or `~/Applications`.
 
 Saved service credentials are encrypted with a key stored in your macOS login Keychain. If the Keychain is locked or access is denied, Nuvra reports an error instead of saving plaintext credentials.
 
@@ -45,15 +51,14 @@ For local Arabic translation, install Ollama and download `gemma4:e4b` from **Mo
 
 A small recording pill appears while you speak. Finishing processes the text and pastes it into the original app.
 
-| Control | Action |
-| --- | --- |
-| **Ctrl + Alt + Space** | Start or finish recording. |
-| **Enter** during recording | Finish recording and paste. |
-| **Esc** during recording | Cancel recording. |
-| **✓** in the recording pill | Finish recording. |
-| **✕** in the recording pill | Cancel recording. |
+| Action | Windows | macOS |
+| --- | --- | --- |
+| Start or finish recording | **Ctrl + Alt + Space** | **Control + Option + Space** |
+| Finish recording and paste | **Enter** or **✓** in the pill | **Return** or **✓** in the pill |
+| Cancel recording | **Esc** or **✕** in the pill | **Escape** or **✕** in the pill |
+| Paste copied text manually | **Ctrl + V** | **Command + V** |
 
-Choose a different shortcut in **Settings**. After pasting, you control when to submit the text in the destination app.
+Choose a different recording shortcut in **Settings**. Windows also offers **Ctrl + Alt + R** and **Ctrl + Shift + Space**; macOS offers **Control + Option + R** and **Control + Shift + Space**. After pasting, you control when to submit the text in the destination app.
 
 With **Wispr Flow** selected, Nuvra's shortcut opens the capture pill. Use Flow's own shortcut to dictate into it. Nuvra prepares and pastes the text after Flow's output settles.
 
@@ -78,15 +83,24 @@ The interface supports English and Arabic. Change it under **Settings → Langua
 | History | Stores recent text and destination information locally. |
 | Settings and vocabulary | Stored on your computer. |
 
-Nuvra keeps its data in `%LOCALAPPDATA%\Arabic Relay` so existing installations retain their settings and history after the rename. Developers can override this location with `ARABIC_RELAY_DATA_DIR`.
+Local data locations:
+
+| Platform | Settings, history, and vocabulary |
+| --- | --- |
+| Windows | `%LOCALAPPDATA%\Arabic Relay` |
+| macOS | `~/Library/Application Support/Nuvra` |
+
+Windows retains the original data directory so existing installations keep their settings and history after the rename. Developers can override the data location on either platform with `ARABIC_RELAY_DATA_DIR`.
 
 ## Updates
 
-Update preferences are under **Settings → Updates**. Automatic updates check GitHub Releases while Nuvra is running and verify the installer with the project's update-signing key before installation. When an update is ready, use **Restart and update**. You can also download the latest installer from the release page.
+Update preferences are under **Settings → Updates**. On Windows, automatic updates check GitHub Releases while Nuvra is running and verify the installer with the project's update-signing key before installation. When an update is ready, use **Restart and update**. You can also download the latest installer from the release page.
+
+On macOS, updates notify you about new releases without downloading or installing them. Download the matching Mac asset, quit Nuvra, and replace the app in **Applications**. Choose **Off** to disable update checks.
 
 ## Run from source
 
-Use Windows with Git and Python 3.12 or newer. The automated build uses Python 3.13.
+On Windows, use Git and Python 3.12 or newer. The automated build uses Python 3.13.
 
 ```powershell
 git clone https://github.com/Mahmoud6901/nuvra.git
@@ -100,9 +114,11 @@ For the NVIDIA GPU dependency, install the optional extra with `.\.venv\Scripts\
 
 The Python package remains `arabic_relay`. Both `nuvra` and `arabic-relay` are available as installed launch commands.
 
-On macOS, use Python 3.13 from python.org or Homebrew:
+On macOS, use Python 3.13 from python.org or Homebrew. On Intel Macs, install the source-build prerequisites with `brew install openssl@3 rust` first. Clone the repository and run:
 
 ```sh
+git clone https://github.com/Mahmoud6901/nuvra.git
+cd nuvra
 python3.13 -m venv .venv
 .venv/bin/python -m pip install -e '.[build]'
 .venv/bin/python -m arabic_relay
@@ -112,7 +128,7 @@ Development runs need microphone and Accessibility permissions for the Python ho
 
 ### Tests
 
-Install Node.js to run the interface tests. Prepare the small speech model used by the Python tests, then run the suites from the repository root.
+Install Node.js to run the interface tests. On Windows, prepare the small speech model used by the Python tests, then run the full suites from the repository root.
 
 ```powershell
 .\.venv\Scripts\python.exe -c "from huggingface_hub import snapshot_download; snapshot_download('Systran/faster-whisper-tiny', revision='d90ca5fe260221311c53c58e660288d3deb8d356')"
@@ -126,9 +142,21 @@ node tests/test_incremental_ui.cjs --quick --inline
 node tests/test_voice.cjs --quick
 ```
 
-The release workflow includes the complete test and installer verification steps. See [the release workflow](.github/workflows/release.yml).
+On macOS, run the platform and shared delivery checks used by macOS CI:
 
-### Build the installer
+```sh
+.venv/bin/python -m unittest discover -s tests -p 'test_macos.py' -v
+.venv/bin/python -m unittest discover -s tests -p 'test_paste.py' -v
+.venv/bin/python -m unittest discover -s tests -p 'test_build_macos.py' -v
+for test in tests/test_*.cjs; do node "$test" || exit 1; done
+node tests/test_incremental_ui.cjs --quick
+node tests/test_incremental_ui.cjs --quick --inline
+node tests/test_voice.cjs --quick
+```
+
+Run the full Python suite on Windows because it includes Windows-specific integration tests. The release workflow includes the complete test and installer verification steps. See [the release workflow](.github/workflows/release.yml).
+
+### Build the Windows installer
 
 Install Inno Setup 6, then run the build from the repository root.
 
