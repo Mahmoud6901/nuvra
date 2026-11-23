@@ -27,11 +27,13 @@ import sys
 import threading
 import time
 import traceback
+import unicodedata
 from xml.sax.saxutils import escape
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import train_speech  # noqa: E402
+from arabic_relay import paths  # noqa: E402
 
 TASK = 'Nuvra Idle Retraining'
 RUN_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
@@ -99,6 +101,86 @@ def transcript(path):
     except UnicodeDecodeError:
         return None, 'the transcript is not UTF-8'
     return (text, None) if train_speech.words(text) else (None, 'the transcript is empty')
+
+
+def agreement_words(text):
+    """Ignore casing, Arabic vocalization and sentence punctuation, keeping numbers and technical names intact."""
+    text = unicodedata.normalize('NFC', text).casefold()
+    text = ''.join(c for c in text if not '\u064b' <= c <= '\u0652')
+    return [w for word in text.split() if (w := word.rstrip('.,!?،؟؛'))]
+
+
+def load_verifier(folder):
+    from faster_whisper import WhisperModel
+    return WhisperModel(str(folder), device='cpu', compute_type='int8', cpu_threads=4, local_files_only=True)
+
+
+def verify_transcript(model, audio):
+    segments, _ = model.transcribe(str(audio), language='ar', task='transcribe', beam_size=5,
+                                   condition_on_previous_text=False, vad_filter=True)
+    return ' '.join(segment.text.strip() for segment in segments)
+
+
+def publish_agreement(inbox, audio, label):
+    """Link complete files without replacing an existing pair or an intervening human correction."""
+    target = inbox / audio.name
+    try:
+        os.link(audio, target)
+    except FileExistsError:
+        if target.is_symlink() or not target.is_file():
+            return False
+        if not target.samefile(audio) and train_speech.sha256_file(target) != train_speech.sha256_file(audio):
+            return False
+    try:
+        os.link(label, inbox / label.name)
+        return True
+    except FileExistsError:
+        return False
+
+
+def verify_pending(inbox, model_folder):
+    """The app publishes the proposal last. Never overwrite a user's correction, even during verification."""
+    folder = inbox / '.pending'
+    if folder.resolve().parent != inbox.resolve() or folder.is_symlink():
+        raise train_speech.InputError('pending recordings must be stored directly in the inbox')
+    model = None
+    matched = skipped = 0
+    for label in sorted(folder.glob('*.txt')):
+        if label.is_symlink() or not label.is_file():
+            continue
+        sounds = [p for ext in AUDIO if (p := label.with_suffix(ext)).is_file() and not p.is_symlink()]
+        if len(sounds) != 1:
+            continue
+        audio, = sounds
+        try:
+            proposed, _ = transcript(label)
+            eligible = proposed and not (inbox / label.name).exists() and 0 < audio.stat().st_size <= MAX_AUDIO_BYTES
+            binding = label.with_suffix('.verifier')
+            if eligible and label.stem.startswith('nuvra-'):
+                try:
+                    eligible = (binding.is_file() and not binding.is_symlink() and binding.stat().st_size <= 8192
+                                and Path(binding.read_text(encoding='utf-8').strip()) == model_folder)
+                except (UnicodeError, FileNotFoundError):
+                    eligible = False
+            if eligible:
+                try:
+                    eligible = 0.2 <= audio_seconds(audio) <= train_speech.MAX_SECONDS
+                except (ValueError, RuntimeError, OSError):
+                    eligible = False
+            if eligible:
+                if model is None:
+                    model = load_verifier(model_folder)
+                words = agreement_words(proposed)
+                if words and words == agreement_words(verify_transcript(model, audio)):
+                    matched += int(publish_agreement(inbox, audio, label))
+                else:
+                    skipped += 1
+            label.unlink(missing_ok=True)
+            audio.unlink(missing_ok=True)
+            binding.unlink(missing_ok=True)
+        except FileNotFoundError:
+            continue  # a foreground correction can supersede this pending pair
+    return matched, skipped
 
 
 def scan(folder, manifest, durations, now=None):
@@ -302,6 +384,19 @@ def check(args, now=None):
     if value.get('state') == 'training':                  # that run neither finished nor gave way: it was killed
         retry_later(value, value.get('pendingKey'), now)
         status.set('failed', 'the previous run ended unexpectedly')
+    def give_way():
+        status.set(INTERRUPTED, 'stopped because the computer is in use; tried again when it is idle')
+        os._exit(GAVE_WAY)
+
+    if args.verify_model and any((args.inbox / '.pending').glob('*.txt')):
+        reason = None if args.now else blocked(args.root, args.idle_minutes)
+        if reason:
+            status.set('waiting', reason)
+            return 0
+        status.set('verifying', 'checking recorded transcripts with the second local speech model')
+        with contextlib.nullcontext() if args.now else Watchdog(give_way, args.idle_minutes):
+            accepted, skipped = verify_pending(args.inbox, args.verify_model)
+        value['lastVerification'] = {'matched': accepted, 'disagreed': skipped}
     mark = signature(listing(args.inbox), args.manifest)
     if value.get('settled') == mark:
         status.set('waiting for recordings', 'nothing new in the inbox')
@@ -334,10 +429,6 @@ def check(args, now=None):
     train_speech.write_json(manifest, {'clips': clips})
     status.set('training', f'learning from {len(clips)} recordings ({len(pending)} new or changed)', inbox=inbox,
                started=time.strftime('%Y-%m-%d %H:%M:%S'))
-
-    def give_way():
-        status.set(INTERRUPTED, 'stopped because the computer is in use; tried again when it is idle')
-        os._exit(GAVE_WAY)
 
     with contextlib.nullcontext() if args.now else Watchdog(give_way, args.idle_minutes):
         code = run_training(train_arguments(args, manifest), folder / 'last-training.log')
@@ -410,6 +501,8 @@ def pythonw():
 def command_arguments(args, command):
     values = [str(Path(__file__).resolve()), command, '--root', str(args.root), '--inbox', str(args.inbox),
               '--manifest', str(args.manifest), '--base', str(args.base), '--idle-minutes', str(args.idle_minutes)]
+    if args.verify_model:
+        values.extend(('--verify-model', str(args.verify_model)))
     return subprocess.list2cmdline(values)
 
 
@@ -491,6 +584,8 @@ def startup_entry(value=None, delete=False):
 
 
 def register(args):
+    if args.verify_model and not (args.verify_model / 'model.bin').is_file():
+        raise train_speech.InputError('the second local speech model is missing model.bin')
     args.inbox.mkdir(parents=True, exist_ok=True)
     code, message = scheduler('create', task_xml(args, current_user()))
     if code == 0:
@@ -504,7 +599,13 @@ def register(args):
         print('Task Scheduler denied access, so it was added to this account\'s startup programs instead.')
     else:
         raise train_speech.InputError(f'Task Scheduler refused the task ({code}): {message}')
-    print(f'Put recordings and transcripts in: {args.inbox}')
+    config = paths.DATA / 'speech-learning.json'
+    if args.capture_recordings or args.verify_model:
+        train_speech.write_json(config, {'inbox': str(args.inbox), 'automaticLabels': bool(args.verify_model),
+                                         'verifyModel': str(args.verify_model) if args.verify_model else None})
+    else:
+        config.unlink(missing_ok=True)
+    print(f'Recordings and transcripts inbox: {args.inbox}')
     return 0
 
 
@@ -517,6 +618,7 @@ def unregister(args):
         raise train_speech.InputError(f'could not remove the task ({code}): {message}')
     if code == ACCESS_DENIED and scheduler('find')[0] == 0:
         raise train_speech.InputError('Task Scheduler denied removing the task')
+    (paths.DATA / 'speech-learning.json').unlink(missing_ok=True)
     print('Automatic retraining is off. Recordings, models and reports were kept.')
     return 0
 
@@ -526,14 +628,17 @@ def watch(args):
 
     Each check runs in its own windowless process, because giving way to the user ends that process.
     """
+    expected = f'"{pythonw()}" ' + command_arguments(args, 'watch')
+    registration = hashlib.sha256(expected.encode()).hexdigest()
     try:
-        with train_speech.exclusive(args.root / 'idle' / 'watch'):
-            while startup_entry() is not None:
+        with train_speech.exclusive(args.root / 'idle' / 'watch' / registration):
+            while startup_entry() == expected:
+                # run() holds the common training lock even while two registrations are handing over.
                 subprocess.run(f'"{pythonw()}" ' + command_arguments(args, 'run'), cwd=train_speech.ROOT,
                                stdin=subprocess.DEVNULL, creationflags=NO_WINDOW)
                 for _ in range(EVERY_MINUTES * 6):
                     time.sleep(10)
-                    if startup_entry() is None:
+                    if startup_entry() != expected:
                         break
     except train_speech.Busy:
         pass
@@ -545,6 +650,8 @@ def show(args):
     registered = scheduler('find')[0] == 0
     print(f"Registered: {'Task Scheduler' if registered else 'startup programs' if startup_entry() else 'no'}")
     print(f"Inbox:      {args.inbox}")
+    if args.verify_model:
+        print(f"Verifier:   {args.verify_model}")
     for label, key in (('State', 'state'), ('Detail', 'message'), ('Checked', 'checked'), ('Finished', 'finished'),
                        ('Model', 'latestModel'), ('Report', 'lastReport')):
         if value.get(key) and (key != 'latestModel' or Path(value[key]).is_dir()):
@@ -567,6 +674,8 @@ def parse(argv):
     parser.add_argument('--inbox', type=Path, help='folder of recordings and transcripts (default: <root>/inbox)')
     parser.add_argument('--manifest', type=Path, help='public corpus (default: <root>/corpus/manifest.json)')
     parser.add_argument('--base', type=Path, help='base checkpoint (default: <root>/base)')
+    parser.add_argument('--capture-recordings', action='store_true', help='register this inbox for corrected in-app dictation')
+    parser.add_argument('--verify-model', type=Path, help='also learn from unedited dictation agreed by this second local Whisper model')
     parser.add_argument('--idle-minutes', type=int, default=IDLE_MINUTES, help='how long nobody must have used the computer')
     parser.add_argument('--now', action='store_true', help='with run: do not wait for idle, power or a free GPU')
     args = parser.parse_args(argv)
@@ -576,6 +685,15 @@ def parse(argv):
     args.inbox = (args.inbox or args.root / 'inbox').resolve()
     args.manifest = (args.manifest or args.root / 'corpus' / 'manifest.json').resolve()
     args.base = (args.base or args.root / 'base').resolve()
+    if not args.verify_model and args.command in ('run', 'status'):
+        try:
+            config = json.loads((paths.DATA / 'speech-learning.json').read_text(encoding='utf-8'))
+            if config['automaticLabels'] is True and Path(config['inbox']).resolve() == args.inbox:
+                args.verify_model = Path(config['verifyModel'])
+        except (OSError, ValueError, KeyError, TypeError):
+            pass  # capture is optional for a manually populated inbox
+    if args.verify_model:
+        args.verify_model = args.verify_model.resolve()
     return args
 
 

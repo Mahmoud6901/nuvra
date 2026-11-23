@@ -16,7 +16,7 @@ import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import aliases, engine_host, incremental, local_translator, locate, models, paths, store
+from . import aliases, engine_host, incremental, local_translator, locate, models, paths, speech_learning, store
 
 
 TRANSCRIBE_LOCK = threading.Lock()
@@ -437,7 +437,7 @@ def transcribe(audio, content_type, vocabulary='', provider='whisper', inline_mo
         raise ValueError('التسجيل لازم يكون WebM أو WAV أو MP4 وأقل من 24 MB.')
     keywords = parse_keywords(vocabulary)
     if provider == 'cohere':
-        return transcribe_cohere(audio, kind)
+        return speech_learning.offer(transcribe_cohere(audio, kind))
     folder = speech_model_path()
     if folder is None:
         raise ValueError('اختار نموذج Whisper من تبويب النماذج.')
@@ -459,7 +459,9 @@ def transcribe(audio, content_type, vocabulary='', provider='whisper', inline_mo
     response['timings'] = {'transcribeMs': round((time.monotonic() - started) * 1000),
                            'path': 'reusable' if engine_enabled() else 'one-shot'}
     logging.info('Speech timing: full clip %d ms (%s)', response['timings']['transcribeMs'], response['timings']['path'])
-    return response
+    if retry:                            # an alternate reading of a recording that is already followed
+        return response
+    return speech_learning.offer(response, folder if kind != 'wav' else None, result.get('seconds'), audio)
 
 
 def approved_rules():
@@ -702,7 +704,7 @@ def stream_finish(job_id, last_seq, total_samples):
                                'passInferenceMs': job.inference_ms[-20:]}
         logging.info('Speech timing: stop to transcript %d ms (%s, %d passes, final %s)', response['timings']['stopToFinalMs'],
                      response['timings']['path'], len(job.windows), response['incremental']['finalDecode'])
-        return response
+        return speech_learning.offer(response, job.key[0], total_samples / incremental.RATE)
     finally:
         release_stream(job)
 

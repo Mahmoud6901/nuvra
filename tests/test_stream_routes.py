@@ -64,6 +64,44 @@ class StreamRoutes(unittest.TestCase):
     def short_recording(self):
         self.audio = self.recognizer.audio = scripted_audio(9)
 
+    def test_short_whole_and_streamed_dictations_reach_correct_last_with_only_the_recording_source(self):
+        inbox = paths.DATA / 'training'
+        inbox.mkdir()
+        (paths.DATA / 'speech-learning.json').write_text(
+            json.dumps({'inbox': str(inbox), 'automaticLabels': False}), encoding='utf-8')
+        self.short_recording()
+        self.addCleanup(speech.speech_learning.forget_all)
+        heard = 'ما تشغلش البرنامج'
+        fixed = 'غير إعدادات الصوت بعد الاجتماع'
+        readings = {'text': heard, 'segments': [], 'seconds': 9.0}
+        with patch.object(speech, 'engine_enabled', return_value=True), \
+                patch.object(speech, 'engine_request', return_value=readings):
+            for streamed in (False, True):
+                audio = bytes.fromhex('1a45dfa3') + bytes([streamed])
+                if streamed:
+                    job = 'history-source-' + 's' * 30
+                    last_seq = self.record(job, inline=True)
+                    status, result = self.post('/api/stream/finish', {
+                        'jobId': job, 'lastSeq': last_seq, 'totalSamples': len(self.audio) // 2})
+                else:
+                    status, result = self.post('/api/transcribe', audio, {'Content-Type': 'audio/webm'})
+                self.assertEqual(status, 200, result)
+                recording = result['learning']['id']
+                status, kept = self.post('/api/speech-learning', audio, {
+                    'Content-Type': 'audio/webm', 'X-Relay-Learning-Id': recording})
+                self.assertEqual((status, kept), (200, {'kept': True, 'staged': False}))
+                connection = http.client.HTTPConnection(*self.httpd.server_address, timeout=10)
+                try:
+                    connection.request('GET', '/api/speech-learning/last', headers={'Origin': server.ORIGIN,
+                                                                                    'X-Relay-Token': server.CSRF})
+                    recent = json.loads(connection.getresponse().read())
+                finally:
+                    connection.close()
+                self.assertEqual((recent['id'], recent['text']), (recording, heard))
+                self.assertEqual(self.post('/api/speech-learning/correct', {'id': recording, 'text': fixed}),
+                                 (200, {'saved': True}))
+        self.assertEqual([path.read_text(encoding='utf-8') for path in inbox.glob('*.txt')], [fixed, fixed])
+
     def test_spoken_language_survives_a_settings_change_during_dictation(self):
         self.short_recording()
         job = 'inline-language-test-0001'

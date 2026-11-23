@@ -103,6 +103,28 @@ class IdleInbox(unittest.TestCase):
         self.assertFalse(self.report().get('latestModel'))
         self.assertNotIn('a new model is ready', self.report()['message'])
 
+    def test_pending_machine_labels_are_verified_only_while_idle_and_enabled(self):
+        self.args.verify_model = self.root / 'full-whisper-model'
+        (self.args.inbox / '.pending').mkdir()
+        self.put('.pending/note.wav', b'personal recording')
+        self.put('.pending/note.txt', 'ما تشغلش الملف')
+        with patch.object(idle, 'load_verifier') as load, \
+                patch.object(idle, 'verify_transcript', return_value='شغل الملف') as decode:
+            self.blocked.return_value = 'the computer is in use'
+            self.assertEqual(self.check(), 0)
+            load.assert_not_called()
+            self.blocked.return_value = None
+            verifier = self.args.verify_model
+            self.args.verify_model = None
+            self.assertEqual(self.check(), 0)
+            load.assert_not_called()
+            self.args.verify_model = verifier
+            self.assertEqual(self.check(), 0)
+            load.assert_called_once_with(verifier)
+            decode.assert_called_once()
+        self.assertEqual(self.report()['lastVerification']['disagreed'], 1)
+        self.train.assert_not_called()
+
     def test_rejects_conflicting_personal_labels_and_copies_of_held_out_audio(self):
         self.put('a.wav', b'personal')
         self.put('a.txt', 'قال حاجة')

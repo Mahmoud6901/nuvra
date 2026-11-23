@@ -15,7 +15,7 @@ import urllib.request
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import __version__, aliases, direct_sessions, diagnostics, firstrun, history, locate, paths, speech, store, t3, translate, translators, updates
+from . import __version__, aliases, direct_sessions, diagnostics, firstrun, history, locate, paths, speech, speech_learning, store, t3, translate, translators, updates
 from . import inline, local_translator
 
 ROOT = paths.ROOT
@@ -93,6 +93,7 @@ class Handler(BaseHTTPRequestHandler):
                                      'wisprFlowInstalled': locate.tool_path('wispr') is not None,
                                      'cohereConfigured': (paths.DATA / 'cohere.bin').is_file(),
                                      'selfLearning': store.self_learning_enabled(),
+                                     'speechLearning': speech_learning.mode(),
                                      'autoSpelling': store.auto_spelling_enabled(),
                                      'promptChoice': (choice := translate.prompt_choice()),
                                      'promptLabel': translators.label(choice), 'missingTools': locate.missing_tools(),
@@ -101,6 +102,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(local_translator.status())
             if path.path == '/api/local-translator/progress':
                 return self.respond(local_translator.JOB.progress())
+            if path.path == '/api/speech-learning/last':
+                return self.respond(speech_learning.last())
             if path.path == '/api/history':
                 return self.respond(history.entries())
             if path.path == '/api/translators':
@@ -155,6 +158,11 @@ class Handler(BaseHTTPRequestHandler):
                 except ValueError:
                     raise ValueError('صوت التسجيل مش سليم.') from None
                 return self.respond(speech.stream_chunk(self.headers.get('X-Relay-Stream-Job'), seq, self.rfile.read(size)))
+            if self.path == '/api/speech-learning':
+                if not 0 < size <= speech_learning.MAX_AUDIO:
+                    raise ValueError('حجم الطلب مش صحيح.')
+                return self.respond(speech_learning.keep(self.headers.get('X-Relay-Learning-Id'), self.rfile.read(size),
+                                                         self.headers.get('Content-Type', '')))
             if not 0 < size <= 100000:
                 raise ValueError('حجم الطلب مش صحيح.')
             body = json.loads(self.rfile.read(size))
@@ -235,6 +243,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(local_translator.JOB.cancel())
             if self.path == '/api/auto-spelling':
                 return self.respond(store.set_auto_spelling(body.get('enabled')))
+            if self.path == '/api/speech-learning/correct':
+                return self.respond(speech_learning.correct(body.get('id'), body.get('text')))
             if self.path == '/api/history/delete':
                 return self.respond(history.delete(body.get('id')))
             if self.path == '/api/history/clear':

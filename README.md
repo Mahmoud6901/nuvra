@@ -76,7 +76,7 @@ The interface supports English and Arabic. Change it under **Settings → Langua
 
 | Feature | Processing and storage |
 | --- | --- |
-| Local Whisper | Transcribes audio on your computer. |
+| Local Whisper | Transcribes audio on your computer. If you enable recording capture, eligible clips and source transcripts are saved in your local training inbox. |
 | Cohere or Wispr Flow | Uses the selected provider's online speech service. |
 | Local Arabic translation | Runs through Ollama when enabled and available. |
 | Structured prompts and translation fallback | Sends text through your selected Codex or Claude Code provider using your signed-in account. |
@@ -158,7 +158,7 @@ Run the full Python suite on Windows because it includes Windows-specific integr
 
 ### Train the speech model
 
-`scripts/train_speech.py` fine-tunes the Egyptian Whisper Turbo model on recordings with checked transcripts and exports a folder you can select in Nuvra. It is a developer tool: it needs an NVIDIA GPU (about 2 GB of free memory) and its own Python environment, and nothing is added to the app. Training runs offline on your computer. Nuvra never collects recordings for it.
+`scripts/train_speech.py` fine-tunes the Egyptian Whisper Turbo model on labeled recordings and exports a folder you can select in Nuvra. Training runs offline and requires an NVIDIA GPU (about 2 GB of free memory) and its own Python environment.
 
 Create the environment and download the base checkpoint once:
 
@@ -210,7 +210,13 @@ With `--if-changed` the command exits immediately unless the clips, transcripts 
 ./.local/asr-training-env/Scripts/python.exe scripts/retrain_when_idle.py unregister
 ```
 
-Put each recording in `.local/asr-learning/inbox` next to its corrected transcript with the same name, for example `note-1.wav` (or `.webm`, `.mp4`) and `note-1.txt`. Save the transcript as UTF-8, and keep each recording under 30 seconds. Nuvra never records or transcribes anything for the inbox.
+To capture eligible Whisper dictations, register with `--capture-recordings`. In **History → Correct last dictation**, you can fix what you actually said. Saving a correction pairs it with that recording. To include unedited recordings automatically when a second local model agrees, register with its folder as well. For example, with the Egyptian Turbo dictation model and a downloaded full Whisper large-v3 verifier:
+
+```powershell
+./.local/asr-training-env/Scripts/python.exe scripts/retrain_when_idle.py register --capture-recordings --verify-model "$env:LOCALAPPDATA\Arabic Relay\models\large-v3"
+```
+
+The second model checks queued recordings during idle time. Disagreements are dropped. A source correction takes priority. To turn off capture, register again without the capture and verification options. You can also add a pair manually to `.local/asr-learning/inbox`, for example `note-1.webm` and a UTF-8 `note-1.txt`. The trainer accepts recordings up to 30 seconds long.
 
 - A recording without a transcript is ignored. `status` lists every ignored file and the reason.
 - Only a new pair or a corrected transcript starts training, together with the public corpus. Idle time alone never does. Deleting a pair leaves it out of later runs.
