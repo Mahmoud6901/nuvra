@@ -71,6 +71,11 @@ const RELAY_EN={
  "متقدم":"Advanced",
  "حوّل الكلام وأنا بتكلم":"Transcribe while I speak",
  "مع Whisper بس. النص بيخلص أسرع بعد ما توقف. شغال تلقائي مع كارت NVIDIA، ومقفول على المعالج لأن النماذج الكبيرة مش بتلحق. الصوت بيفضل في الذاكرة على جهازك.":"Whisper only. The text finishes faster after you stop. On automatically with an NVIDIA graphics card, and off on the CPU because large models can't keep up. The audio stays in memory on this computer.",
+ "لغة الكلام في Whisper":"Whisper speech language",
+ "اختار لغة التسجيل.":"Choose the speech language.",
+ "تلقائي (عربي أو إنجليزي)":"Automatic (Arabic or English)",
+ "عربي (ممكن تستخدم أسماء إنجليزي)":"Arabic (can include English names)",
+ "إنجليزي":"English",
  "سيب نموذج الكلام في الذاكرة":"Keep the speech model in memory",
  "5 دقايق بعد آخر تسجيل":"5 minutes after the last recording",
  "15 دقيقة":"15 minutes",
@@ -574,7 +579,8 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
   <section class="group" id="aboutSettings"><h2>التحديثات</h2><p id="appVersion">Nuvra</p><div class="setting"><label for="updateMode">طريقة التحديث</label><select id="updateMode"><option value="auto">تلقائي</option><option value="notify">تنبيه بس</option><option value="off">إيقاف</option></select></div><label class="choice"><input id="installOnQuit" type="checkbox" checked>ثبّت التحديثات لما أقفل البرنامج</label></section>
   <details class="group" id="advancedSettings"><summary>متقدم</summary>
    <div class="setting-block" id="incrementalSettings"><label class="choice"><input id="incrementalDictation" type="checkbox" disabled aria-describedby="incrementalHelp">حوّل الكلام وأنا بتكلم</label><p class="group-help" id="incrementalHelp">مع Whisper بس. النص بيخلص أسرع بعد ما توقف. شغال تلقائي مع كارت NVIDIA، ومقفول على المعالج لأن النماذج الكبيرة مش بتلحق. الصوت بيفضل في الذاكرة على جهازك.</p></div>
-   <div class="setting-block" id="engineSettings"><div class="setting"><label for="engineIdle">سيب نموذج الكلام في الذاكرة</label><select id="engineIdle" aria-describedby="engineHelp"><option value="300">5 دقايق بعد آخر تسجيل</option><option value="900">15 دقيقة</option><option value="3600">ساعة</option><option value="0">لحد ما أقفل البرنامج</option></select></div><label class="choice"><input id="enginePrewarm" type="checkbox">جهّز النموذج أول ما البرنامج يفتح</label><label class="choice"><input id="cpuOnly" type="checkbox">استخدم المعالج دايمًا</label><p class="group-help" id="engineHelp">لما النموذج يخرج من الذاكرة، أول تسجيل بعدها بياخد كام ثانية زيادة.</p><p class="group-help" id="gpuBackoff" role="status" hidden></p><button class="btn" id="retryGpu" hidden>جرّب كارت الشاشة تاني</button></div>
+   <div class="setting-block" id="engineSettings"><div class="setting"><label for="spokenLanguage">لغة الكلام في Whisper</label><select id="spokenLanguage"><option value="auto">تلقائي (عربي أو إنجليزي)</option><option value="ar">عربي (ممكن تستخدم أسماء إنجليزي)</option><option value="en">إنجليزي</option></select></div>
+   <div class="setting"><label for="engineIdle">سيب نموذج الكلام في الذاكرة</label><select id="engineIdle" aria-describedby="engineHelp"><option value="300">5 دقايق بعد آخر تسجيل</option><option value="900">15 دقيقة</option><option value="3600">ساعة</option><option value="0">لحد ما أقفل البرنامج</option></select></div><label class="choice"><input id="enginePrewarm" type="checkbox">جهّز النموذج أول ما البرنامج يفتح</label><label class="choice"><input id="cpuOnly" type="checkbox">استخدم المعالج دايمًا</label><p class="group-help" id="engineHelp">لما النموذج يخرج من الذاكرة، أول تسجيل بعدها بياخد كام ثانية زيادة.</p><p class="group-help" id="gpuBackoff" role="status" hidden></p><button class="btn" id="retryGpu" hidden>جرّب كارت الشاشة تاني</button></div>
    <div class="setting-block"><label for="vocabulary">كلمات عايز النموذج يسمعها صح (اختياري)</label><input class="field" id="vocabulary" maxlength="3000" dir="auto" placeholder="React، أسماء مشاريع، كلمات تقنية…"><div class="vocabulary-meta"><span id="vocabularyStatus" role="status"></span><button class="text-btn" id="viewVocabulary">شوف الكلمات المحفوظة</button></div></div>
    <details class="setting-block" id="aliasEditor"><summary>قواعد الكلمات</summary><p class="group-help">القاعدة بتبدّل كلمة عربي زي ما اتسمعت بالكتابة الإنجليزي اللي تختارها، كل مرة تيجي ككلمة كاملة. القواعد اللي وافقت عليها بس هي اللي بتغيّر نصك.</p>
     <div id="aliasList" class="alias-list"></div><div id="aliasProposals" class="alias-list"></div>
@@ -661,6 +667,7 @@ function update(){
  $('autoSpelling').checked=autoSpellingEnabled===true;$('autoSpelling').disabled=blocked||autoSpellingEnabled===null;
  $('spellingStatus').textContent=autoSpellingEnabled?'On: check English spellings with the selected prompt model.':'Off: show the transcript without an automatic model call.';
  $('incrementalDictation').checked=incrementalEnabled;$('incrementalDictation').disabled=blocked||!csrf;$('incrementalSettings').hidden=dictationProvider!=='whisper';
+ $('spokenLanguage').value=engineSettings.spokenLanguage||'auto';$('spokenLanguage').disabled=blocked;
  $('engineIdle').value=String(engineSettings.idleSeconds??300);$('engineIdle').disabled=blocked;$('enginePrewarm').checked=!!engineSettings.prewarm;$('enginePrewarm').disabled=blocked;
  $('gpuBackoff').hidden=!engineSettings.gpuBackoff;$('retryGpu').hidden=!engineSettings.gpuBackoff;
  if(engineSettings.gpuBackoff)$('gpuBackoff').textContent=tr('كارت الشاشة وقف بعد خطأ. الكلام هيشتغل على المعالج لحد {time}.',{time:new Date(engineSettings.gpuBackoff.until*1000).toLocaleTimeString(relayLocale)});
@@ -797,6 +804,7 @@ $('pickModel').addEventListener('click',async()=>{try{await pickModelFolder();}c
 $('localTranslator').addEventListener('change',async()=>{if(busy||listening||!localTranslatorState){update();return;}const enabled=$('localTranslator').checked;busy=true;update();try{localTranslatorState=await api('/api/local-translator',{enabled});showModeHelp();notice(enabled?tr('الترجمة هتبقى على جهازك لما ينفع.'):tr('الترجمة هتستخدم النموذج اللي اخترته أونلاين.'),true);}catch(e){notice(e.message);}finally{busy=false;update();}});
 $('selfLearning').addEventListener('change',async()=>{if(busy||listening||selfLearningEnabled===null){update();return;}const enabled=$('selfLearning').checked;busy=true;update();try{const result=await api('/api/self-learning',{enabled});selfLearningEnabled=result.selfLearning;notice(selfLearningEnabled?'Self-learning enabled. Words you type or correct will be saved.':'Self-learning disabled. Saved words and your current draft are preserved.',true);}catch(e){notice(e.message);}finally{busy=false;update();}});
 async function saveEngineSettings(body){busy=true;update();try{engineSettings=await api('/api/engine',body);notice(tr('اتحفظت الإعدادات.'),true);}catch(e){notice(e.message);}finally{busy=false;await refresh();}}
+$('spokenLanguage').addEventListener('change',()=>saveEngineSettings({spokenLanguage:$('spokenLanguage').value}));
 $('engineIdle').addEventListener('change',()=>saveEngineSettings({idleSeconds:Number($('engineIdle').value)}));
 $('enginePrewarm').addEventListener('change',()=>saveEngineSettings({prewarm:$('enginePrewarm').checked}));
 $('retryGpu').addEventListener('click',()=>saveEngineSettings({retryGpu:true}));
@@ -1272,7 +1280,7 @@ function acceptInlineRecognition(r){
  inlineRevision++;inlineSourceText=source;inlineOriginalText=recognised;inlineSourceDirty=false;inlineNeedsTranslation=true;inlineAsrWarning=!!r.issues?.length;inlineDoubt=recognitionDoubt(r);
  $('english').value=source;$('inlineSource').value=source;$('inlineOriginal').textContent=recognised;$('inlineAcknowledge').checked=false;
  inlineSeconds=r.seconds||null;inlineRetries=0;inlineRetryMs=0;inlineCandidateText='';$('inlineCandidatePanel').hidden=true;
- $('inlineEvidence').textContent=r.effectiveAsrConfig?`${r.model} · ${r.device} · multilingual transcription · word timestamps · ${r.effectiveAsrConfig.runtime}`:'This speech provider does not expose recognition evidence here. Correct misheard words in Source and changes.';
+ $('inlineEvidence').textContent=r.effectiveAsrConfig?`${r.model} · ${r.device} · ${r.effectiveAsrConfig.language||'ar/en'} · word timestamps · ${r.effectiveAsrConfig.runtime}`:'This speech provider does not expose recognition evidence here. Correct misheard words in Source and changes.';
  if(audioUrl){$('inlinePlayback').src=audioUrl;$('inlinePlayback').hidden=false;clearTimeout(inlineAudioExpiry);inlineAudioExpiry=setTimeout(()=>{clearAudio();update();},1800000);}
  inlineAutoPrepare=true;invalidate();
 }

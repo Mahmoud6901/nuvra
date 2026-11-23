@@ -46,9 +46,29 @@ def compute_type(device):
     return 'float16' if device == 'cuda' else 'int8'
 
 
+class DictationLanguages:
+    """Limit faster-whisper's per-segment language choice (including batched segments) to Arabic and English."""
+    def __init__(self, backend):
+        self.backend = backend
+        self.first_language = None
+
+    def __getattr__(self, name):
+        return getattr(self.backend, name)
+
+    def detect_language(self, features):
+        ranked = self.backend.detect_language(features)
+        choices = [[pair for pair in segment if pair[0] in ('<|ar|>', '<|en|>')] or segment for segment in ranked]
+        if choices and self.first_language is None:
+            self.first_language = choices[0][0][0][2:-2]
+        return choices
+
+
 def load_model(folder, device):
     from faster_whisper import WhisperModel
-    return WhisperModel(folder, device=device, compute_type=compute_type(device), local_files_only=True)
+    model = WhisperModel(folder, device=device, compute_type=compute_type(device), local_files_only=True)
+    if model.model.is_multilingual:
+        model.model = DictationLanguages(model.model)
+    return model
 
 
 def out_of_memory(error):
@@ -110,23 +130,34 @@ def decode(model, samples, device, keywords, check=False, inline_mode=False, ret
                    vad_filter=not check, condition_on_previous_text=False,
                    initial_prompt=hints, hotwords=hints)
     options.update(checked_overrides(overrides))
+    detector = model.model if isinstance(model.model, DictationLanguages) else None
+    if detector:
+        detector.first_language = None
+        # With multilingual decoding the per-segment detector replaces this token before generating words.
+        # Supplying a starting token avoids encoding the audio a second time just to initialize the tokenizer.
+        if options['multilingual'] and options['language'] is None:
+            options['language'] = 'en'
+    arabic_hints = f'من الأسماء اللي بنستخدمها {hints}.' if hints and options['language'] == 'ar' and not options['multilingual'] else None
+    if arabic_hints:
+        options['initial_prompt'] = arabic_hints
     if inline_mode or window:
         if inline_mode and not model.model.is_multilingual:
             raise ValueError('MULTILINGUAL_REQUIRED')
         options.update(word_timestamps=True)
         if inline_mode:
-            options.update(vad_filter=not retry, condition_on_previous_text=retry, initial_prompt=None)
+            options.update(vad_filter=not retry, condition_on_previous_text=retry, initial_prompt=arabic_hints)
         if window and context:
             options['initial_prompt'] = ' '.join(part for part in (options['initial_prompt'], context) if part)
         segments, info = model.transcribe(samples, **options)
         rows = segment_rows(segments)
-        config = {'runtime': 'faster-whisper 1.2.1', 'task': 'transcribe', 'multilingual': True, 'language': None,
-                  'detectedLanguage': getattr(info, 'language', None), 'path': 'window' if window else 'serial',
+        config = {'runtime': 'faster-whisper 1.2.1', 'task': 'transcribe', 'multilingual': options['multilingual'],
+                  'detectedLanguage': detector.first_language if detector and options['multilingual'] else getattr(info, 'language', None),
+                  'path': 'window' if window else 'serial',
                   'wordTimestamps': True, 'sampleRate': 16000, 'beamSize': 5, 'vad': options['vad_filter'],
                   'conditionOnPreviousText': options['condition_on_previous_text'],
                   'device': device, 'computeType': compute_type(device)}
         return {'text': ''.join(row['text'] for row in rows), 'segments': rows,
-                'effectiveAsrConfig': {**config, 'beamSize': options['beam_size'], 'language': options['language'],
+                'effectiveAsrConfig': {**config, 'beamSize': options['beam_size'], 'language': None if options['multilingual'] else options['language'],
                                        'vad': options['vad_filter'], 'hints': hints},
                 'effectiveOptions': {key: options[key] for key in ('beam_size', 'language', 'multilingual', 'vad_filter',
                                                                   'condition_on_previous_text', 'hotwords')}}
@@ -145,11 +176,11 @@ def decode(model, samples, device, keywords, check=False, inline_mode=False, ret
             'effectiveOptions': {key: options[key] for key in ('beam_size', 'language', 'vad_filter', 'hotwords')}}
 
 
-def run_model(samples, folder, device, keywords, check=False, inline_mode=False, retry=False, loaded_model=None):
+def run_model(samples, folder, device, keywords, check=False, inline_mode=False, retry=False, loaded_model=None, overrides=None):
     """Transcribe on the requested device; if CUDA fails for any reason, retry once on the CPU."""
     def run(device):
         model = loaded_model[1] if loaded_model and loaded_model[0] == device else load_model(folder, device)
-        value = decode(model, samples, device, keywords, check, inline_mode, retry)
+        value = decode(model, samples, device, keywords, check, inline_mode, retry, overrides=overrides)
         return value if inline_mode else value['text']
 
     if device == 'cuda':
@@ -230,7 +261,7 @@ def main(args):
         raise ValueError('RETRY_TOO_LONG')
     result = run_model(samples, folder, device, request['keywords'], check=request.get('check') is True,
                        inline_mode=request.get('inline') is True, retry=request.get('retry') is True,
-                       loaded_model=loaded_model)
+                       loaded_model=loaded_model, overrides=request.get('overrides'))
     print(json.dumps({**result, 'seconds': len(samples) / 16000}, ensure_ascii=True), flush=True)
 
 
@@ -305,8 +336,9 @@ class Engine:
         self.send({'event': 'state', 'state': 'warming', 'device': self.device})
         started = time.monotonic()
         noise = (np.random.default_rng(7).standard_normal(16000) * 0.01).astype(np.float32)
-        segments, _ = self.model.transcribe(noise, task='transcribe', language=None, multilingual=True, beam_size=5,
-                                            vad_filter=False, condition_on_previous_text=False, without_timestamps=True)
+        segments, _ = self.model.transcribe(noise, task='transcribe', language='en', beam_size=5, temperature=0.0,
+                                            max_new_tokens=1, vad_filter=False, condition_on_previous_text=False,
+                                            without_timestamps=True)
         list(segments)
         return round((time.monotonic() - started) * 1000)
 

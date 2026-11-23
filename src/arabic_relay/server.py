@@ -176,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(speech.set_incremental(body.get('enabled')))
             if self.path == '/api/engine':
                 return self.respond(speech.set_engine_settings(body.get('idleSeconds'), body.get('prewarm'),
-                                                               body.get('retryGpu') is True))
+                                                               body.get('retryGpu') is True, body.get('spokenLanguage')))
             if self.path == '/api/wispr/open':
                 return self.respond(speech.open_wispr_flow())
             if self.path == '/api/whisper-model':

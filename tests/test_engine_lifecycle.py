@@ -116,7 +116,7 @@ class DeviceMemory(unittest.TestCase):
         with patch.object(engine_host.HOST, 'watch') as watch:
             speech.set_engine_settings(900, True)
         self.assertTrue(watch.called)
-        self.assertEqual(speech.engine_settings(), {'idleSeconds': 900, 'prewarm': True, 'gpuBackoff': None})
+        self.assertEqual(speech.engine_settings(), {'idleSeconds': 900, 'prewarm': True, 'gpuBackoff': None, 'spokenLanguage': 'auto'})
         for value in (7, -1, '300', True):
             with self.assertRaises(ValueError):
                 speech.set_engine_settings(value)

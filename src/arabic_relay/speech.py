@@ -156,10 +156,21 @@ def speech_device():
 
 def engine_settings():
     return {'idleSeconds': int(store.get_setting('engine_idle_seconds', 300) or 0),
+            'spokenLanguage': store.get_setting('spoken_language', 'auto'),
             'prewarm': bool(store.get_setting('engine_prewarm', 0)), 'gpuBackoff': gpu_backoff()}
 
 
-def set_engine_settings(idle_seconds=None, prewarm=None, retry_gpu=False):
+def language_header(language):
+    if language in ('ar', 'en'):
+        return {'overrides': {'language': language, 'multilingual': False}}
+    return {}
+
+
+def set_engine_settings(idle_seconds=None, prewarm=None, retry_gpu=False, spoken_language=None):
+    if spoken_language is not None:
+        if spoken_language not in ('auto', 'ar', 'en'):
+            raise ValueError('اختار لغة التسجيل.')
+        store.set_setting('spoken_language', spoken_language)
     if idle_seconds is not None:
         if type(idle_seconds) is not int or idle_seconds not in (0, 300, 900, 3600):
             raise ValueError('اختار النموذج يفضل متحمّل قد إيه.')
@@ -406,7 +417,7 @@ def cohere_request(audio, key):
 def parse_keywords(vocabulary):
     if not isinstance(vocabulary, str) or len(vocabulary) > 3000:
         raise ValueError('الكلمات المساعدة لازم تكون أقل من 3,000 حرف.')
-    keywords = [word.strip() for word in vocabulary.replace('\n', ',').split(',') if word.strip()]
+    keywords = [word.strip() for word in re.split('[,،\n]', vocabulary) if word.strip()]
     if len(keywords) > 40 or any(len(word) > 80 or any(c in word for c in '<>\r\n') for word in keywords):
         raise ValueError('استخدم لحد 40 كلمة قصيرة، بينهم فاصلة.')
     # Only hints the user typed reach Whisper. Learned English words pushed it to write mixed speech as English.
@@ -436,6 +447,7 @@ def transcribe(audio, content_type, vocabulary='', provider='whisper', inline_mo
     try:
         if engine_enabled():
             header = {'format': 'encoded', 'keywords': keywords, **({'inline': True, 'retry': retry} if inline_mode else {})}
+            header.update(language_header(store.get_setting('spoken_language', 'auto')))
             result = engine_request((str(folder), speech_device()), header, audio,
                                     timeout=retry_seconds if retry else 300, cancel_event=cancel_event)
         else:
@@ -623,12 +635,13 @@ def stream_start(job_id, inline_mode=False, vocabulary=''):
         return {'accepted': False, 'reason': 'busy'}
     try:
         key = (str(folder), speech_device())
-        engine_host.HOST.watch(engine_settings()['idleSeconds'])
+        settings = engine_settings()
+        engine_host.HOST.watch(settings['idleSeconds'])
         engine_host.HOST.hold()
         engine_host.HOST.ensure(*key)
         rules = approved_rules()     # snapshotted with the model, device and hints for this recording
         job = incremental.REGISTRY.start(job_id, lambda: incremental.Job(job_id, inline_mode, keywords, key, window_transcriber(key),
-                                                                          rules=rules))
+                                                                          rules=rules, decode_header=language_header(settings['spokenLanguage'])))
     except BaseException:
         engine_host.HOST.release_hold()
         TRANSCRIBE_LOCK.release()
@@ -676,7 +689,7 @@ def stream_finish(job_id, last_seq, total_samples):
             if not planned:
                 logging.info('Incremental dictation: whole-recording fallback (%s)', reason.split(':')[0])
             # The authoritative recording, decoded whole with the baseline settings for this writing mode.
-            result = engine_request(job.key, {'format': 'pcm16', 'keywords': job.keywords,
+            result = engine_request(job.key, {'format': 'pcm16', 'keywords': job.keywords, **job.decode_header,
                                               **({'inline': True} if job.inline else {})}, pcm, cancel_event=job.cancelled)
         response = whisper_response(result, Path(job.key[0]), job.inline, job.rules)
         done = time.monotonic()
@@ -719,6 +732,8 @@ def run_worker(folder, audio, keywords, check=False, inline_mode=False, retry=Fa
     device = speech_device()
     env = worker_environment()
     header = {'keywords': keywords, **({'check': True} if check else {})}
+    if not check:
+        header.update(language_header(store.get_setting('spoken_language', 'auto')))
     if inline_mode:
         header.update(inline=True, retry=retry)
     for attempt in ((1,) if retry else (1, 2)):

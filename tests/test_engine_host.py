@@ -89,6 +89,36 @@ class Framing(unittest.TestCase):
         speech_worker.decode(model, np.zeros(16000, dtype=np.float32), 'cuda', ['React'], window=True)
         self.assertEqual(model.transcribe.call_args.kwargs['initial_prompt'], 'React')
 
+    def test_automatic_dictation_uses_the_best_supported_language_per_segment(self):
+        backend = Mock()
+        backend.detect_language.return_value = [[('<|it|>', .6), ('<|ar|>', .3), ('<|en|>', .1)],
+                                                [('<|en|>', .9), ('<|ar|>', .1)]]
+        model = Mock()
+        with patch('faster_whisper.WhisperModel', return_value=model):
+            model.model = backend
+            speech_worker.load_model('test', 'cpu')
+        def transcribe(samples, **options):
+            self.assertIsNotNone(options['language'])  # skip the redundant whole-recording language detection
+            self.assertTrue(options['multilingual'])
+            choices = model.model.detect_language('encoded features')
+            self.assertEqual([row[0][0] for row in choices], ['<|ar|>', '<|en|>'])
+            return [], Mock(language=options['language'])
+        model.transcribe.side_effect = transcribe
+        result = speech_worker.decode(model, np.zeros(16000), 'cpu', [], inline_mode=True)
+        self.assertEqual(result['effectiveAsrConfig']['detectedLanguage'], 'ar')
+
+    def test_arabic_dictation_keeps_explicit_names_as_bilingual_hints_in_both_modes(self):
+        for inline in (False, True):
+            model = Mock()
+            model.transcribe.return_value = ([], Mock(language='ar'))
+            names = speech.parse_keywords('SDK، React')
+            speech_worker.decode(model, np.zeros(16000), 'cpu', names, inline_mode=inline,
+                                 overrides=speech.language_header('ar')['overrides'])
+            options = model.transcribe.call_args.kwargs
+            self.assertEqual((options['language'], options['multilingual']), ('ar', False))
+            self.assertEqual(options['hotwords'], 'SDK, React')
+            self.assertIn('SDK, React', options['initial_prompt'])
+
 
 class Host(unittest.TestCase):
     def host(self, behaviour='normal'):

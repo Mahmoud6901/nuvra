@@ -64,6 +64,20 @@ class StreamRoutes(unittest.TestCase):
     def short_recording(self):
         self.audio = self.recognizer.audio = scripted_audio(9)
 
+    def test_spoken_language_survives_a_settings_change_during_dictation(self):
+        self.short_recording()
+        job = 'inline-language-test-0001'
+        self.assertEqual(self.post('/api/engine', {'spokenLanguage': 'ar'})[1]['spokenLanguage'], 'ar')
+        last = self.record(job, inline=True)
+        self.post('/api/engine', {'spokenLanguage': 'auto'})
+        with patch.object(speech, 'engine_request', return_value={'text': 'راجع إعدادات SDK'}) as whole:
+            status, result = self.post('/api/stream/finish', {'jobId': job, 'lastSeq': last, 'totalSamples': len(self.audio) // 2})
+        self.assertEqual(status, 200, result)
+        expected = {'language': 'ar', 'multilingual': False}
+        self.assertEqual(whole.call_args.args[1]['overrides'], expected)
+        self.assertTrue(self.recognizer.calls)
+        self.assertTrue(all(call['overrides'] == expected for call in self.recognizer.calls))
+
     def test_a_short_recording_is_read_again_whole_at_stop(self):
         self.short_recording()
         job = 'inline-' + 'h' * 30

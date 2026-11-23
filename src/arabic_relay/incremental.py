@@ -221,12 +221,13 @@ def assemble(words):
 class Job:
     """One recording's PCM, its passes and its provisional text. Owned by its unguessable job ID."""
 
-    def __init__(self, job_id, inline_mode, keywords, key, transcriber, rules=None):
+    def __init__(self, job_id, inline_mode, keywords, key, transcriber, rules=None, decode_header=None):
         self.id = job_id
         self.inline = inline_mode
         self.keywords = list(keywords)
         self.key = key                     # model folder and device, snapshotted at job start
         self.rules = rules                 # approved vocabulary rules in force when the recording started
+        self.decode_header = decode_header or {}
         self.transcriber = transcriber     # callable(header, payload, cancel_event) -> worker result
         self.pcm = bytearray()
         self.next_seq = 0
@@ -326,7 +327,7 @@ class Job:
                     self.buffer_start = min(available, max(self.buffer_start, int(cut * RATE)))
                 start, end = self.buffer_start, available
                 payload = bytes(self.pcm[start * 2:end * 2])
-                header = {'format': 'pcm16', 'window': True, 'inline': self.inline, 'keywords': self.keywords,
+                header = {'format': 'pcm16', 'window': True, 'inline': self.inline, 'keywords': self.keywords, **self.decode_header,
                           'context': self.context(), **({'language': self.language} if self.language else {})}
             index = len(self.windows)
             started = time.monotonic()
