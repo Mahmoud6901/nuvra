@@ -18,6 +18,32 @@ const RELAY_EN={
  "آخر 10 نص. نص بس، محفوظ على جهازك.":"Your last 10 texts. Text only, saved on this computer.",
  "مسح السجل":"Clear history",
  "صحّح آخر تسجيل":"Correct last dictation",
+ "تسجيل الاجتماعات":"Meeting recording",
+ "ابدأ الاجتماع":"Start meeting",
+ "أوقف التسجيل":"Stop recording",
+ "افتح مجلد الاجتماعات":"Open meetings folder",
+ "بيسجّل الميكروفون وصوت مخرج Windows الافتراضي، بما فيه صوت المشاركين.":"Records your microphone and everything playing through the default Windows output, including other participants.",
+ "التسجيل شغّال":"Recording",
+ "التسجيل بيتجهز…":"Starting recording…",
+ "بيحفظ التسجيل…":"Saving recording…",
+ "اتحفظ الاجتماع. التفريغ بيبدأ لما الجهاز يفضى.":"Meeting saved. Transcription starts when the computer is idle.",
+ "تعذّر تحديث حالة التسجيل.":"Couldn’t refresh the recording status.",
+ "اختار مصدر صوت للاجتماع.":"Choose an audio source for the meeting.",
+ "تسجيل الاجتماعات مش متاح على الجهاز ده.":"Meeting capture is unavailable on this device.",
+ "فعّل التعلّم المحلي الأول علشان تسجّل اجتماع.":"Set up a local training inbox before recording a meeting.",
+ "اختار الميكروفون أو صوت الجهاز.":"Choose a microphone or Windows playback device.",
+ "فيه تسجيل اجتماع شغّال بالفعل.":"A meeting recording is already running.",
+ "ما قدرتش أبدأ تسجيل الاجتماع.":"Couldn’t start the meeting recording.",
+ "البرنامج بيقفل.":"Nuvra is closing.",
+ "مساحة القرص مش كفاية، فالتسجيل وقف. اللي اتسجّل محفوظ.":"Recording stopped because the disk is nearly full. Earlier audio was kept.",
+ "ما قدرتش أحفظ التسجيل، فوقف. اللي اتحفظ موجود.":"Recording stopped after a write error. Earlier audio was kept.",
+ "البرنامج قفل قبل ما التسجيل يخلص.":"Nuvra closed before the recording finished.",
+ "ما قدرتش أفتح الميكروفون.":"Couldn’t open the microphone.",
+ "ما قدرتش أفتح صوت الجهاز.":"Couldn’t open the Windows playback device.",
+ "الميكروفون اتفصل أثناء التسجيل.":"The microphone disconnected during recording.",
+ "صوت الجهاز اتفصل أثناء التسجيل.":"The playback device disconnected during recording.",
+ "فيه أجزاء من الصوت ناقصة.":"Some audio was missed.",
+ "ما اتسجّلش صوت. راجع الميكروفون ومخرج الصوت الافتراضي في Windows.":"No audio was captured. Check the default Windows microphone and playback device.",
  "الكلام زي ما اتسمع":"The words as heard",
  "صحّحه أو اكتبه من الأول زي ما اتقال بالظبط. لما تحفظ، الصوت والنص بيتحفظوا على جهازك لتدريب نموذج الكلام.":"Correct it, or rewrite it exactly as you said it. Saving keeps the audio and text on this computer to train the speech model.",
  "احفظ التصحيح":"Save correction",
@@ -551,6 +577,11 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
  <header class="topbar"><div class="brand" dir="ltr">Nuvra</div><div class="tabs" id="tabs" role="tablist" aria-label="أقسام البرنامج"><button class="tab" role="tab" id="historyButton" aria-controls="historyPanel" aria-selected="true">السجل</button><button class="tab" role="tab" id="modelsButton" aria-controls="modelsPanel" aria-selected="false" tabindex="-1">النماذج</button><button class="tab" role="tab" id="settingsButton" aria-controls="settingsPanel" aria-selected="false" tabindex="-1">الإعدادات</button></div><div class="top-key" id="topKey" hidden><span>اختصار التسجيل</span><kbd class="keycap mono" id="topShortcut" dir="ltr">Ctrl + Alt + Space</kbd></div></header>
  <div class="panels">
  <section class="panel" id="historyPanel" role="tabpanel" aria-labelledby="historyButton"><div class="column">
+  <section class="group" id="meetingControls" hidden><h2>تسجيل الاجتماعات</h2>
+   <p class="group-help">بيسجّل الميكروفون وصوت مخرج Windows الافتراضي، بما فيه صوت المشاركين.</p>
+   <div class="inline-actions"><button class="btn primary" id="meetingToggle">ابدأ الاجتماع</button><button class="text-btn" id="meetingFolder" hidden>افتح مجلد الاجتماعات</button></div>
+   <p id="meetingStatus" class="group-help" role="status"></p>
+  </section>
   <p class="panel-intro">آخر 10 نص. نص بس، محفوظ على جهازك.</p>
   <p class="history-message" id="historyMessage" role="status" aria-live="polite"></p>
   <details class="setting-block" id="correctLast" hidden><summary>صحّح آخر تسجيل</summary><label for="correctLastText"><span>الكلام زي ما اتسمع</span> · <time id="correctLastTime"></time></label><textarea class="field" id="correctLastText" dir="auto" maxlength="8000" rows="3" aria-describedby="correctLastHelp"></textarea><p class="group-help" id="correctLastHelp">صحّحه أو اكتبه من الأول زي ما اتقال بالظبط. لما تحفظ، الصوت والنص بيتحفظوا على جهازك لتدريب نموذج الكلام.</p><div class="inline-actions"><button class="btn" id="correctLastSave" disabled>احفظ التصحيح</button><button class="text-btn" id="correctLastCancel">إلغاء</button></div></details>
@@ -733,7 +764,7 @@ async function refresh(){
  if(busy||refreshing)return;refreshing=true;update();loadLocalTranslator();
  try{
  const status=await api('/api/status');csrf=status.csrf;nativeDesktop=!!status.nativeDesktop;speechConfigured=!!status.speechConfigured;$('pickModel').hidden=!nativeDesktop;speechModel=status.speechModel||null;speechDevice=status.speechDevice||'GPU';missingModel=status.missingModel||null;$('cpuOnly').checked=!!status.cpuOnly;wisprFlowInstalled=!!status.wisprFlowInstalled;cohereConfigured=!!status.cohereConfigured;selfLearningEnabled=status.selfLearning!==false;autoSpellingEnabled=status.autoSpelling===true;speechLearning=status.speechLearning||null;incrementalEnabled=status.incrementalDictation===true;engineSettings=status.engineSettings||engineSettings;promptChoice=status.promptChoice||promptChoice;$('promptChoiceLabel').textContent=status.promptLabel||'';missingTools=status.missingTools||{};$('appVersion').textContent='Nuvra '+(status.version||'');$('crashBanner').hidden=!status.crashed;renderUpdate(status.update);updateSpeechStatus();setupPending=!!status.setupNeeded;if(status.setupNeeded&&!setupOffered&&!quickCapture){setupOffered=true;selectTab('models');}
- update();resolveStartup();
+ update();resolveStartup();if(!quickCapture&&speechLearning)refreshMeeting();
  await api('/api/vocabulary').then(showVocabulary).catch(()=>{});
  await api('/api/aliases').then(showAliases).catch(()=>{});
  for(const [kind,path] of Object.entries(missingTools))notice(tr('{tool} اتنقل أو اتمسح: {path}. البرنامج هيستخدم أي نسخة يلاقيها، أو اختار مكانه من تبويب النماذج.',{tool:TOOL_NAMES[kind],path}));
@@ -798,6 +829,35 @@ function renderHistory(){
  }).join(''):`<div class="history-empty"><strong>${tr('لسه مفيش حاجة هنا.')}</strong>${nativeDesktop?`<p>${tr('دوس {key} في أي تطبيق واتكلم، والنص هيتلصق مكان ما كنت بتكتب.',{key:`<kbd class="keycap mono" dir="ltr">${esc(shortcutLabel)}</kbd>`})}</p>`:`<p>${tr('التسجيل بيشتغل من تطبيق الكمبيوتر بس.')}</p>`}</div>`;
 }
 async function loadHistory(){loadLastDictation();try{const result=await api('/api/history');const same=historyLoaded&&JSON.stringify(result.entries)===JSON.stringify(historyItems);historyItems=result.entries;historyLoaded=true;$('historyMessage').textContent='';if(!same)renderHistory();}catch(e){$('historyMessage').textContent=e.message;}}
+let meetingState='idle',meetingPoll=null,meetingChanging=false,meetingRevision=0;
+function showMeeting(m){
+ clearTimeout(meetingPoll);meetingState=m.state;
+ const running=['recording','starting','stopping'].includes(m.state);
+ $('meetingControls').hidden=!m.available&&!running&&!m.id;
+ $('meetingToggle').disabled=meetingChanging||m.state==='starting'||m.state==='stopping'||(!m.available&&!running);
+ $('meetingToggle').textContent=running?tr('أوقف التسجيل'):tr('ابدأ الاجتماع');
+ $('meetingFolder').hidden=!window.pywebview?.api?.open_meetings_folder;
+ const tracks=Object.values(m.sources||{});
+ const empty=tracks.length>0&&tracks.every(track=>track.chunks===0);
+ const messages={starting:tr('التسجيل بيتجهز…'),recording:tr('التسجيل شغّال'),stopping:tr('بيحفظ التسجيل…'),stopped:empty?tr('ما اتسجّلش صوت. راجع الميكروفون ومخرج الصوت الافتراضي في Windows.'):tr('اتحفظ الاجتماع. التفريغ بيبدأ لما الجهاز يفضى.')};
+ const elapsed=m.state==='recording'?Math.floor(m.seconds||0):null;
+ $('meetingStatus').textContent=[messages[m.state],elapsed===null?'':Math.floor(elapsed/60)+':'+String(elapsed%60).padStart(2,'0'),m.error?tr(m.error):m.partial?tr('فيه أجزاء من الصوت ناقصة.'):''].filter(Boolean).join(' · ');
+ if(running)meetingPoll=setTimeout(refreshMeeting,3000);
+}
+async function refreshMeeting(){
+ if(quickCapture||meetingChanging)return;
+ const version=++meetingRevision;
+ try{const m=await api('/api/meetings');if(version===meetingRevision&&m.state)showMeeting(m);}
+ catch{if(version===meetingRevision&&meetingState==='recording'){$('meetingStatus').textContent=tr('تعذّر تحديث حالة التسجيل.');meetingPoll=setTimeout(refreshMeeting,3000);}}
+}
+$('meetingToggle').addEventListener('click',async()=>{
+ if(meetingChanging)return;
+ const stop=meetingState==='recording';meetingChanging=true;meetingRevision++;clearTimeout(meetingPoll);
+ $('meetingToggle').disabled=true;$('meetingStatus').textContent=stop?tr('بيحفظ التسجيل…'):tr('التسجيل بيتجهز…');
+ try{const m=await api(stop?'/api/meetings/stop':'/api/meetings/start',stop?{}:{microphone:true,speakers:true});meetingChanging=false;showMeeting(m);}
+ catch(e){meetingChanging=false;$('meetingToggle').disabled=false;await refreshMeeting();$('meetingStatus').textContent=e.message;}
+});
+$('meetingFolder').addEventListener('click',async()=>{try{await window.pywebview.api.open_meetings_folder(csrf);}catch(e){notice(e.message);}});
 // Correct last dictation: the words heard in one recording, never the pasted text. It appears only while local speech
 // learning is on and the server still holds that recording. A newer dictation never replaces words being corrected here.
 let correctId=null,correctSource='',correctSaving=false;

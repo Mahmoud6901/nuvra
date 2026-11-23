@@ -16,7 +16,7 @@ os.environ['ARABIC_RELAY_NATIVE'] = '1'
 
 import webview
 
-from . import diagnostics, server, locate, paths, speech, store, t3, updates, paste, history, inline
+from . import diagnostics, server, locate, meetings, paths, speech, store, t3, updates, paste, history, inline
 from .hotkey import RecordingHotkey, CaptureHotkeys
 
 if sys.platform == 'darwin':
@@ -365,6 +365,18 @@ class DesktopApi:
         chosen = webview.windows[0].create_file_dialog(webview.FileDialog.FOLDER)
         return chosen[0] if chosen else None
 
+    def open_meetings_folder(self, token):
+        if token != server.CSRF or sys.platform != 'win32':
+            raise ValueError('Invalid request.')
+        config = server.speech_learning.settings()
+        if config is None:
+            raise ValueError('Training inbox is unavailable.')
+        folder = config['inbox'].parent / 'meetings'
+        if folder.resolve() != folder:
+            raise ValueError('Meeting folder must be local.')
+        folder.mkdir(exist_ok=True)
+        os.startfile(folder)
+
     def pick_file(self, token):
         """Browse… for Codex, Claude Code or Wispr Flow: one .exe."""
         if token != server.CSRF:
@@ -386,6 +398,7 @@ def run():
     (paths.DATA / 'instance.json').write_text(json.dumps({'pid': os.getpid(), 'port': httpd.server_address[1]}), encoding='utf-8')
     capture = QuickCapture(store.get_setting('capture_shortcut', 'ctrl-alt-space'))
     try:
+        meetings.recover()
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
         window = webview.create_window('Nuvra', server.ORIGIN, js_api=DesktopApi(capture),
                              width=900, height=680, min_size=(640, 520),
@@ -396,6 +409,7 @@ def run():
                       storage_path=str(paths.DATA / 'NativeWebView'),
                       icon=str(server.ROOT / ('assets/icon.png' if sys.platform == 'darwin' else 'assets/relay.ico')))
     finally:
+        meetings.shutdown()
         capture.stop()
         speech.cancel_preparation()
         speech.shutdown_engine()

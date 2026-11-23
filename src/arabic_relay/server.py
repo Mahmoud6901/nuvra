@@ -16,7 +16,7 @@ import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import __version__, aliases, direct_sessions, diagnostics, firstrun, history, locate, paths, speech, speech_learning, store, t3, translate, translators, updates
-from . import inline, local_translator
+from . import inline, local_translator, meetings
 
 ROOT = paths.ROOT
 PORT = int(os.environ.get('ARABIC_RELAY_PORT', '8788'))
@@ -104,6 +104,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(local_translator.JOB.progress())
             if path.path == '/api/speech-learning/last':
                 return self.respond(speech_learning.last())
+            if path.path == '/api/meetings':
+                return self.respond(meetings.status())
             if path.path == '/api/history':
                 return self.respond(history.entries())
             if path.path == '/api/translators':
@@ -245,6 +247,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(store.set_auto_spelling(body.get('enabled')))
             if self.path == '/api/speech-learning/correct':
                 return self.respond(speech_learning.correct(body.get('id'), body.get('text')))
+            if self.path == '/api/meetings/start':
+                mic, speakers = body.get('microphone'), body.get('speakers')
+                if type(mic) is not bool or type(speakers) is not bool or not (mic or speakers):
+                    raise ValueError('اختار مصدر صوت للاجتماع.')
+                model = speech.speech_model_path()
+                if model is None:
+                    raise ValueError('اختار نموذج Whisper من تبويب النماذج.')
+                return self.respond(meetings.start(model, microphone=mic, speakers=speakers))
+            if self.path == '/api/meetings/stop':
+                return self.respond(meetings.stop())
             if self.path == '/api/history/delete':
                 return self.respond(history.delete(body.get('id')))
             if self.path == '/api/history/clear':
@@ -301,4 +313,9 @@ def main(open_browser=False):
     print('Nuvra · Local: ' + ORIGIN, flush=True)
     if open_browser:
         webbrowser.open(ORIGIN)
-    server.serve_forever()
+    try:
+        meetings.recover()
+        server.serve_forever()
+    finally:
+        meetings.shutdown()
+        server.server_close()

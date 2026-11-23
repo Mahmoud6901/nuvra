@@ -74,6 +74,12 @@ The interface supports English and Arabic. Change it under **Settings → Langua
 
 ## Data and privacy
 
+### Record a meeting on Windows
+
+With a local training inbox registered, open **History → Start meeting**. Nuvra records the default microphone and the default Windows playback device, including other audio playing through that device. Click **Stop recording** to finish. **Open meetings folder** opens the local archive.
+
+Each meeting has a dated folder under `.local/asr-learning/meetings/` in the project when using the default inbox. Nuvra saves separate timestamped microphone and playback clips during recording. After the meeting, the idle task assembles `meeting.m4a` for playback and writes `transcript.txt` with source labels and timestamps. With automatic speech learning enabled, matching transcripts from the two local models go into the training inbox. The archive includes recognized speech even when the models disagree. Recordings, transcripts, and trained weights stay under the Git-ignored `.local/` folder.
+
 | Feature | Processing and storage |
 | --- | --- |
 | Local Whisper | Transcribes audio on your computer. If you enable recording capture, eligible clips and source transcripts are saved in your local training inbox. |

@@ -21,6 +21,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -33,7 +34,8 @@ from xml.sax.saxutils import escape
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import train_speech  # noqa: E402
-from arabic_relay import paths  # noqa: E402
+from meeting_audio import export_recording  # noqa: E402
+from arabic_relay import meetings, paths, speech_learning  # noqa: E402
 
 TASK = 'Nuvra Idle Retraining'
 RUN_KEY = r'Software\Microsoft\Windows\CurrentVersion\Run'
@@ -121,9 +123,10 @@ def verify_transcript(model, audio):
     return ' '.join(segment.text.strip() for segment in segments)
 
 
-def publish_agreement(inbox, audio, label):
+def publish_agreement(inbox, audio, label, stem=None):
     """Link complete files without replacing an existing pair or an intervening human correction."""
-    target = inbox / audio.name
+    stem = stem or audio.stem
+    target = inbox / (stem + audio.suffix)
     try:
         os.link(audio, target)
     except FileExistsError:
@@ -132,7 +135,7 @@ def publish_agreement(inbox, audio, label):
         if not target.samefile(audio) and train_speech.sha256_file(target) != train_speech.sha256_file(audio):
             return False
     try:
-        os.link(label, inbox / label.name)
+        os.link(label, inbox / (stem + '.txt'))
         return True
     except FileExistsError:
         return False
@@ -181,6 +184,99 @@ def verify_pending(inbox, model_folder):
         except FileNotFoundError:
             continue  # a foreground correction can supersede this pending pair
     return matched, skipped
+
+
+def meeting_checkpoint(folder):
+    try:
+        rows = json.loads((folder / 'transcription.json').read_text(encoding='utf-8'))['clips']
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+    if not isinstance(rows, dict):
+        return {}
+    return {name: row for name, row in rows.items() if isinstance(row, dict) and isinstance(row.get('text'), str)
+            and type(row.get('matched')) is bool}
+
+
+def meeting_work(inbox):
+    """Finished sessions with new audio or an interrupted transcript export."""
+    root = inbox.parent / 'meetings'
+    sessions = []
+    if not root.is_dir() or root.resolve() != inbox.parent.resolve() / 'meetings':
+        return sessions
+    for path in sorted(root.glob('*/session.json')):
+        folder = path.parent
+        if folder.resolve() != root.resolve() / folder.name or path.is_symlink():
+            continue
+        try:
+            session = json.loads(path.read_text(encoding='utf-8'))
+            if session.get('version') != 1 or session.get('id') != folder.name or session.get('state') not in (
+                    'finished', 'interrupted', 'error'):
+                continue
+            completed = meeting_checkpoint(folder)
+            chunks = sorted((row for row in session['chunks'] if re.fullmatch(r'(mic|system)-\d{6}\.wav', row['file'])
+                             and (folder / row['file']).is_file() and not (folder / row['file']).is_symlink()),
+                            key=lambda row: (row['startMs'], row['file']))
+            if chunks and (any(row['file'] not in completed for row in chunks)
+                           or not (folder / 'transcript.txt').exists() or not (folder / 'meeting.m4a').exists()):
+                sessions.append((folder, session, chunks, completed))
+        except (OSError, ValueError, TypeError, AttributeError, KeyError):
+            continue  # an unreadable manifest cannot prevent other meetings or dictations from being processed
+    return sessions
+
+
+def process_meetings(inbox, verify_model, work):
+    """Archive source transcripts; only independently matching clips enter the existing supervised training pipeline."""
+    primary = verifier = loaded_path = None
+    accepted = processed = 0
+    for folder, session, chunks, completed in work:
+        if not (folder / 'meeting.m4a').exists():
+            export_recording(folder, chunks, session.get('seconds', 0))
+        model_path = Path(session.get('modelPath') or '')
+        if not model_path.is_absolute() or not (model_path / 'model.bin').is_file():
+            continue
+        independent = verify_model and speech_learning.verifier_for(model_path, verify_model)
+        for row in chunks:
+            name = row['file']
+            if name in completed:
+                continue
+            audio = folder / name
+            result = {'text': '', 'matched': False}
+            try:
+                seconds = audio_seconds(audio)
+            except (OSError, ValueError, RuntimeError):
+                seconds = 0
+            if 0.2 <= seconds <= train_speech.MAX_SECONDS:
+                if loaded_path != model_path:
+                    primary = load_verifier(model_path)
+                    loaded_path = model_path
+                first = verify_transcript(primary, audio).strip()
+                result['text'] = first
+                if first and independent:
+                    if verifier is None:
+                        verifier = load_verifier(verify_model)
+                    second = verify_transcript(verifier, audio)
+                    result['matched'] = bool(train_speech.words(first)) and agreement_words(first) == agreement_words(second)
+                if result['matched']:
+                    label = audio.with_suffix('.txt')
+                    speech_learning.write(label, first.encode('utf-8'))
+                    stem = 'meeting-' + train_speech.sha256_file(audio)
+                    accepted += int(publish_agreement(inbox, audio, label, stem))
+            else:
+                result['error'] = 'unusable audio or unsupported duration'
+            completed[name] = result
+            train_speech.write_json(folder / 'transcription.json', {'clips': completed})
+            processed += 1
+        lines = []
+        for row in chunks:
+            words = completed[row['file']]['text']
+            if words:
+                seconds = int(row['startMs']) // 1000
+                timestamp = f'{seconds // 3600:02}:{seconds // 60 % 60:02}:{seconds % 60:02}'
+                lines.append(f"[{timestamp}] {row['file'].split('-')[0]}  {words}")
+        temporary = folder / 'transcript.txt.tmp'
+        temporary.write_text('\n'.join(lines) + ('\n' if lines else ''), encoding='utf-8')
+        temporary.replace(folder / 'transcript.txt')
+    return {'processed': processed, 'accepted': accepted}
 
 
 def scan(folder, manifest, durations, now=None):
@@ -388,15 +484,23 @@ def check(args, now=None):
         status.set(INTERRUPTED, 'stopped because the computer is in use; tried again when it is idle')
         os._exit(GAVE_WAY)
 
-    if args.verify_model and any((args.inbox / '.pending').glob('*.txt')):
+    if meetings.active():
+        status.set('waiting', 'meeting recording in progress')
+        return 0
+    work = meeting_work(args.inbox)
+    has_pending = args.verify_model and any((args.inbox / '.pending').glob('*.txt'))
+    if work or has_pending:
         reason = None if args.now else blocked(args.root, args.idle_minutes)
         if reason:
             status.set('waiting', reason)
             return 0
-        status.set('verifying', 'checking recorded transcripts with the second local speech model')
+        status.set('verifying', 'processing meeting audio' if work else 'checking recorded transcripts with the second local speech model')
         with contextlib.nullcontext() if args.now else Watchdog(give_way, args.idle_minutes):
-            accepted, skipped = verify_pending(args.inbox, args.verify_model)
-        value['lastVerification'] = {'matched': accepted, 'disagreed': skipped}
+            if work:
+                value['lastMeetings'] = process_meetings(args.inbox, args.verify_model, work)
+            if has_pending:
+                accepted, skipped = verify_pending(args.inbox, args.verify_model)
+                value['lastVerification'] = {'matched': accepted, 'disagreed': skipped}
     mark = signature(listing(args.inbox), args.manifest)
     if value.get('settled') == mark:
         status.set('waiting for recordings', 'nothing new in the inbox')

@@ -41,14 +41,39 @@ class Routes(unittest.TestCase):
         self.addCleanup(self.httpd.server_close)
         self.addCleanup(self.httpd.shutdown)
 
-    def status(self, method, url):
+    def status(self, method, url, body=None, token=None):
         connection = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
-        headers = {'Origin': server.ORIGIN, 'X-Relay-Token': server.CSRF, 'Content-Type': 'application/json'}
+        headers = {'Origin': server.ORIGIN, 'X-Relay-Token': server.CSRF if token is None else token,
+                   'Content-Type': 'application/json'}
         # An empty JSON object reaches the route; validation errors (400) prove routing happened.
-        connection.request(method, url, body=b'{}' if method == 'POST' else None, headers=headers)
+        connection.request(method, url, body=json.dumps(body or {}).encode() if method == 'POST' else None, headers=headers)
         code = connection.getresponse().status
         connection.close()
         return code
+
+    def test_only_selected_meeting_sources_start_and_status_never_touches_recording_devices(self):
+        route = '/api/meetings/start'
+        with patch.object(server.meetings, 'start', return_value={}) as start, \
+                patch.object(server.meetings, 'stop', return_value={}) as stop, \
+                patch.object(server.meetings, 'status', return_value={'state': 'idle'}), \
+                patch.object(server.speech, 'speech_model_path', return_value=Path('model')) as model:
+            self.assertEqual(self.status('GET', '/api/meetings'), 200)
+            for invalid in ({}, {'microphone': False, 'speakers': False}, {'microphone': 'false', 'speakers': True}):
+                self.assertEqual(self.status('POST', route, invalid), 400)
+            selected = {'microphone': False, 'speakers': True}
+            self.assertEqual(self.status('POST', route, selected, token='invalid'), 403)
+            start.assert_not_called()
+            stop.assert_not_called()
+            for mic, speakers in ((True, False), (False, True), (True, True)):
+                selected = {'microphone': mic, 'speakers': speakers}
+                self.assertEqual(self.status('POST', route, selected), 200)
+                start.assert_called_with(Path('model'), **selected)
+            self.assertEqual(self.status('POST', '/api/meetings/stop'), 200)
+            stop.assert_called_once()
+            model.return_value = None
+            start.reset_mock()
+            self.assertEqual(self.status('POST', route, selected), 400)
+            start.assert_not_called()
 
     def test_every_interface_route_is_handled(self):
         html = (paths.ROOT / 'index.html').read_text(encoding='utf-8')
@@ -57,6 +82,8 @@ class Routes(unittest.TestCase):
         self.assertIn('/api/transcribe', routes)
         unhandled = []
         with patch.object(server.t3, 'load_auth', return_value=None), \
+                patch.object(server.meetings, 'start', return_value={}), \
+                patch.object(server.meetings, 'stop', return_value={}), \
                 patch.object(server.direct_sessions, 'catalog', return_value={'projects': [], 'apps': []}), \
                 patch.object(server.translate, 'codex_text', side_effect=ValueError('no network in tests')), \
                 patch.object(server.speech, 'open_wispr_flow', return_value={'installed': False}):

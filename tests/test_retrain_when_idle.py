@@ -67,6 +67,17 @@ class IdleInbox(unittest.TestCase):
         self.assertEqual(self.check(), 0)
         self.train.assert_not_called()
 
+    def test_active_meeting_blocks_idle_verification_and_training_even_during_a_manual_check(self):
+        self.args.now = True
+        self.put('waiting.wav', b'manually approved audio')
+        self.put('waiting.txt', 'احفظ الملف')
+        with patch.object(idle.meetings, 'active', return_value=True), \
+                patch.object(idle, 'meeting_work') as search:
+            self.assertEqual(self.check(), 0)
+            search.assert_not_called()
+        self.assertIn('meeting', self.report()['message'])
+        self.train.assert_not_called()
+
     def test_new_pair_waits_for_idle_changed_label_retrains_and_model_selection_survives(self):
         self.put('note.wav', b'personal audio')
         self.put('note.txt', 'افتح الملف')
