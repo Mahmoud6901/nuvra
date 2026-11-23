@@ -156,6 +156,70 @@ node tests/test_voice.cjs --quick
 
 Run the full Python suite on Windows because it includes Windows-specific integration tests. The release workflow includes the complete test and installer verification steps. See [the release workflow](.github/workflows/release.yml).
 
+### Train the speech model
+
+`scripts/train_speech.py` fine-tunes the Egyptian Whisper Turbo model on recordings with checked transcripts and exports a folder you can select in Nuvra. It is a developer tool: it needs an NVIDIA GPU (about 2 GB of free memory) and its own Python environment, and nothing is added to the app. Training runs offline on your computer. Nuvra never collects recordings for it.
+
+Create the environment and download the base checkpoint once:
+
+```powershell
+py -3.12 -m venv .local/asr-training-env
+./.local/asr-training-env/Scripts/python.exe -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cu128
+./.local/asr-training-env/Scripts/python.exe -m pip install transformers==4.55.4 accelerate==1.16.0 faster-whisper==1.2.1 ctranslate2==4.8.3
+./.local/asr-training-env/Scripts/python.exe -c "from huggingface_hub import snapshot_download; snapshot_download('mohammedaly22/whisper-large-v3-turbo-egyptian-code-switching', revision='2d9f6140a9a4e340541a3183e1700bafb336fd75', local_dir='.local/asr-learning/base')"
+```
+
+Describe the recordings in `.local/asr-learning/corpus/manifest.json`. Paths are relative to the manifest, and each recording may be up to 30 seconds long:
+
+```json
+{"clips": [
+  {"id": "clip-001", "split": "train", "group": "mixed", "path": "audio/clip-001.wav", "reference": "راجع صفحة الـ login"}
+]}
+```
+
+- `split` is `train`, `dev` or `test`. Training learns from `train` and chooses the best checkpoint on `dev`. `test` clips are never trained on, decoded or scored; their files and sentences are only compared against the other splits. Keep them for a separate evaluation.
+- `group` is a label such as `egyptian` or `mixed`. The dev score is the average of the groups, and a group may not get noticeably worse.
+- Optional fields: `language` (`ar` or `en`), `recording` (an identifier shared by clips cut from one recording), `audio_sha256`, and `approved`. A clip with `"approved": false` is ignored until its transcript is checked.
+
+A manifest that repeats an audio file, recording or sentence across splits is rejected.
+
+```powershell
+./.local/asr-training-env/Scripts/python.exe scripts/train_speech.py --check   # validate the manifest only
+./.local/asr-training-env/Scripts/python.exe scripts/train_speech.py           # train and export
+```
+
+Use `--epochs`, `--max-steps`, `--batch-size`, `--lr` and `--rank` to adjust a run; `--help` lists every option. The first run caches the encoder's output for each clip (about 4 MB each), so later runs only encode new clips.
+
+When the result beats the base model on `dev`, it is saved as a new folder `.local/asr-learning/models/large-v3-turbo-egyptian-<time>`. In Nuvra, open **Models**, choose **Browse**, and select that folder. Keep the folder name: Nuvra recognizes the model family from it. If nothing improved, no model is written, existing models stay as they are, and the exit code is 3. Every run leaves a report in `.local/asr-learning/runs`.
+
+**Learn from new recordings.** Add new clips with checked transcripts to the manifest, or keep them in a manifest of their own and pass both. Each run starts from the base checkpoint and learns from all approved clips. From the second accepted model on, a new one must also beat the previously accepted model on the current `dev` clips.
+
+```powershell
+./.local/asr-training-env/Scripts/python.exe scripts/train_speech.py --if-changed --manifest .local/asr-learning/corpus/manifest.json .local/asr-learning/more/manifest.json
+```
+
+With `--if-changed` the command exits immediately unless the clips, transcripts or settings changed since the last run. Only one run uses the folder at a time; a second one exits with code 4.
+
+#### Retrain automatically when the computer is idle (Windows)
+
+`scripts/retrain_when_idle.py` watches an inbox folder and retrains when you add corrected recordings. Register it once, from a normal account:
+
+```powershell
+./.local/asr-training-env/Scripts/python.exe scripts/retrain_when_idle.py register
+./.local/asr-training-env/Scripts/python.exe scripts/retrain_when_idle.py status
+./.local/asr-training-env/Scripts/python.exe scripts/retrain_when_idle.py unregister
+```
+
+Put each recording in `.local/asr-learning/inbox` next to its corrected transcript with the same name, for example `note-1.wav` (or `.webm`, `.mp4`) and `note-1.txt`. Save the transcript as UTF-8, and keep each recording under 30 seconds. Nuvra never records or transcribes anything for the inbox.
+
+- A recording without a transcript is ignored. `status` lists every ignored file and the reason.
+- Only a new pair or a corrected transcript starts training, together with the public corpus. Idle time alone never does. Deleting a pair leaves it out of later runs.
+- Inbox pairs are used for training only. A recording that repeats a `dev` or `test` clip is left out.
+- A hidden check runs every 15 minutes. Training starts after 10 minutes without keyboard or mouse input (change it with `--idle-minutes` when registering), on mains power, with a free GPU and 8 GB of free disk space. It stops at the first keyboard or mouse input and is tried again later. If Windows cannot confirm mains power, it waits. A failed run is retried after a growing delay.
+- The same dev checks apply, so a run may end without a new model. A new model gets its own folder and is never activated: your choice in **Models** stays as it is. `status` shows the latest model, which you can select with **Browse**. Delete old model folders you no longer use; each takes about 1.6 GB.
+
+The task belongs to your account and needs no administrator rights. If Task Scheduler denies access, `register` adds a hidden startup entry for your account instead. To check once without waiting for idle, use `run --now`. Details are in `.local/asr-learning/idle/status.json`, and the last training output is in `last-training.log` beside it. `unregister` keeps your recordings, models and reports.
+
 ### Build the Windows installer
 
 Install Inno Setup 6, then run the build from the repository root.
