@@ -20,6 +20,8 @@ MODELS = {
                  'revision': 'edaa852ec7e145841d8ffdb056a99866b5f0a478', 'bytes': 3_090_835_702},
     'large-v3-turbo': {'repo': 'mobiuslabsgmbh/faster-whisper-large-v3-turbo',
                        'revision': '0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf', 'bytes': 1_621_665_983},
+    'large-v3-turbo-egyptian': {'repo': 'Abdallah151/faster-whisper-egyptian-code-switching-large-v3-turbo',
+                                'revision': '6e677f363081c4eaf87e287c816404accf571d53', 'bytes': 1_622_886_267},
 }
 # CTranslate2 ships its own cuDNN; GPU speech needs only these two cuBLAS DLLs from NVIDIA's official wheel.
 GPU_WHEEL = {
@@ -66,6 +68,8 @@ def gpu_runtime_dir():
 
 def model_label(folder):
     name = str(folder).lower()
+    if 'large-v3-turbo-egyptian' in name or 'egyptian-code-switching-large-v3-turbo' in name:
+        return 'Whisper large-v3-turbo-egyptian'
     if 'large-v3-turbo' in name:
         return 'Whisper large-v3-turbo'
     if 'large-v3' in name:
@@ -189,7 +193,7 @@ def setup_main(args):
         watch_parent(int(args[0]))  # closing the window stops the download; partial files stay for the next try
         name = args[1]
         if name not in MODELS:
-            raise ValueError('اختار Whisper large-v3 أو large-v3-turbo.')
+            raise ValueError('اختار نموذج Whisper من القائمة.')
         folder = download_model(name, lambda stage, done, total: say(stage=stage, done=done, total=total))
         if args[2] == '1' and gpu_runtime_dir() is None:
             wheel = fetch(GPU_WHEEL['url'], runtime_dir() / 'cublas.whl', GPU_WHEEL['sha256'], GPU_WHEEL['bytes'],

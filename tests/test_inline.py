@@ -139,6 +139,17 @@ class InlineCore(unittest.TestCase):
         # Normal quotation marks don't protect Arabic prose.
         self.assertEqual(len(inline.request(body('He said "راجع"'))[0]['spans']), 1)
 
+    def test_arabic_articles_and_conjunctions_attached_to_english_words(self):
+        cases = [('راجع الـsettings page ومتغيرش الـlogin flow.', ['Review the', "and don’t change the"],
+                  'Review the settings page and don’t change the login flow.'),
+                 ('قارن بين React وTypeScript', ['Compare', 'and'], 'Compare React and TypeScript'),
+                 ('ضيفه للـAPI', ['Add it to the'], 'Add it to the API')]
+        for source, translations, expected in cases:
+            with self.subTest(source=source):
+                result = inline.process(body(source), lambda req: reply(req, translations))
+                self.assertEqual(result['outputText'], expected)
+                self.assertEqual(result['workingText'], source)
+
     def test_property_immutable_slices_and_repeated_slots(self):
         rng = random.Random(19)
         for _ in range(80):

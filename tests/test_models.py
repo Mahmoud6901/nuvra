@@ -85,6 +85,9 @@ class Models(unittest.TestCase):
 
     def test_model_label(self):
         for folder, label in (('x/models/large-v3-turbo', 'Whisper large-v3-turbo'),
+                              ('x/models/large-v3-turbo-egyptian', 'Whisper large-v3-turbo-egyptian'),
+                              ('x/models--Abdallah151--faster-whisper-egyptian-code-switching-large-v3-turbo/snapshots/6e6',
+                               'Whisper large-v3-turbo-egyptian'),
                               ('x/models--mobiuslabsgmbh--faster-whisper-large-v3-turbo/snapshots/0a3', 'Whisper large-v3-turbo'),
                               ('E/models/large-v3-edaa852', 'Whisper large-v3'), ('D:/نماذج/my model', 'Whisper (your model)')):
             self.assertEqual(models.model_label(Path(folder)), label)

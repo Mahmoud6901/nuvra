@@ -198,6 +198,7 @@ const RELAY_EN={
  "البرنامج محتاج إذن المايك. اسمح بيه من إعدادات الخصوصية في النظام.":"The app needs microphone permission. Allow it in your system privacy settings.",
  "الأدق":"Most accurate",
  "الأسرع":"Fastest",
+ "للكلام المصري مع كلمات إنجليزي":"For Egyptian Arabic mixed with English",
  "بجرّب الكلام…":"Testing speech…",
  "وقف. دوس كمّل التحميل وهيكمل من مكانه.":"Paused. Press Resume download to continue where it stopped.",
  "بتتحمّل مكتبة NVIDIA":"Downloading the NVIDIA library",
@@ -256,7 +257,7 @@ const RELAY_EN={
  "اختار القاعدة شغالة ولا لأ.":"Choose whether the rule is on.",
  "النص لازم يكون أقل من 12,000 حرف.":"The text must be under 12,000 characters.",
  "كارت الشاشة ما قدرش يشغّل النموذج، فالكلام هيشتغل على المعالج. تقدر تغيّر ده من الإعدادات.":"The graphics card couldn't run the model, so speech will run on the CPU. You can change this in Settings.",
- "اختار Whisper large-v3 أو large-v3-turbo.":"Choose Whisper large-v3 or large-v3-turbo.",
+ "اختار نموذج Whisper من القائمة.":"Choose a Whisper model from the list.",
  "فيه تحميل شغال بالفعل.":"A download is already running.",
  "التحميل وقف فجأة. جرّب تاني.":"The download stopped unexpectedly. Try again.",
  "اختصار التسجيل ما اشتغلش. أعد تشغيل البرنامج أو اختار اختصار تاني.":"The recording shortcut didn't start. Restart the app or choose another shortcut.",
@@ -1086,7 +1087,7 @@ window.addEventListener('beforeunload',()=>{cancelSpeechPreparation();cancelLive
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&!busy)api('/api/status').then(s=>{csrf=s.csrf;wisprFlowInstalled=!!s.wisprFlowInstalled;cohereConfigured=!!s.cohereConfigured;selfLearningEnabled=s.selfLearning!==false;autoSpellingEnabled=s.autoSpelling===true;update();if(s.connected!==connected)refresh();}).catch(()=>{});});
 let speechModel=null,speechDevice='GPU',missingModel=null,SETUP_POLL=1000,setupOffered=false,setupPending=false,setupInfo=null,setupProgress=null,setupLast=null,setupSpeed='',setupTimer=null,speechRows='';
 const gb=bytes=>(bytes/1e9).toFixed(1);
-const WHISPER_NOTES={'large-v3':tr('الأدق'),'large-v3-turbo':tr('الأسرع')};
+const WHISPER_NOTES={'large-v3':tr('الأدق'),'large-v3-turbo':tr('الأسرع'),'large-v3-turbo-egyptian':tr('للكلام المصري مع كلمات إنجليزي')};
 function setupRunning(){return ['downloading','checking'].includes(setupProgress?.state);}
 function modelProgress(p){
  if(p.state==='checking')return `<p class="row-progress" role="status">${tr('بجرّب الكلام…')}</p>`;

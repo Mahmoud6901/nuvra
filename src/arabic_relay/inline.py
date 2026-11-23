@@ -56,6 +56,11 @@ SHORT_FRAGMENT = 5                                               # words
 ENGLISH_ENDINGS = {'re', 've', 'll', 'em'}
 ENGLISH_WITH_APOSTROPHE = {"ma'am", 'ma’am'}
 ARABIC_PUNCTUATION = {'،': ',', '؛': ';', '؟': '?'}
+# These particles can be a whole Arabic token attached to the following English word, e.g. في الـsettings.
+ENGLISH_WORD_PREFIXES = {
+    'ال', 'بال', 'لل', 'كال', 'ب', 'ل', 'ك', 'و', 'ف', 'وال', 'فال',
+    'وبال', 'فبال', 'ولل', 'فلل', 'وكال', 'فكال',
+}
 
 
 def digest(text):
@@ -147,7 +152,7 @@ def detect(text, terms=()):
                 issues.append(issue('unresolved_script'))
             i += 1
             continue
-        start = i
+        start = word_start = i
         while i < len(text) and i not in blocked and arabic_part(text[i]):
             i += 1
         end = i
@@ -158,13 +163,17 @@ def detect(text, terms=()):
                 j += 1
             if j == i or j >= len(text) or j in blocked or not arabic(text[j]):
                 break
-            i = j
+            i = word_start = j
             while i < len(text) and i not in blocked and arabic_part(text[i]):
                 i += 1
             end = i
-        if (start and text[start - 1].isascii() and text[start - 1].isalnum()) or (end < len(text) and text[end].isascii() and text[end].isalnum()):
+        right = text[end:end + 1]
+        prefix = ''.join(c for c in text[word_start:end] if c != 'ـ' and not ud.category(c).startswith('M'))
+        attached = right.isascii() and right.isalpha() and prefix in ENGLISH_WORD_PREFIXES
+        if (start and text[start - 1].isascii() and text[start - 1].isalnum()) or (right.isascii() and right.isalnum() and not attached):
             issues.append(issue('ambiguous_boundary'))
-        spans.append({'start_cp': start, 'end_cp': end, 'exact_source': text[start:end], 'group_id': 'utterance'})
+        spans.append({'start_cp': start, 'end_cp': end, 'exact_source': text[start:end], 'group_id': 'utterance',
+                      **({'space_after': True} if attached else {})})
         i = end
     stretches = romanized_ranges(text, blocked)
     spans = [span for span in spans if not any(span['start_cp'] < b and a < span['end_cp'] for a, b in stretches)]
@@ -253,6 +262,8 @@ def reconstruct(req, raw):
                 words = re.findall(r'[A-Za-z][\w.-]*', value)
                 if words and ((before and words[0].casefold() == before[-1].casefold()) or (after and words[-1].casefold() == after[0].casefold())):
                     issues.append(issue('anchor_duplication', span_id=span['id']))
+                if span.get('space_after'):
+                    value += ' '
             pieces.extend([english_punctuation(source, cursor, a, req['protected_ranges']), value])
             cursor = b
         output = ''.join(pieces) + english_punctuation(source, cursor, len(source), req['protected_ranges'])

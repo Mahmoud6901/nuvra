@@ -174,7 +174,8 @@ class FirstRun(unittest.TestCase):
         absent = {'installed': False, 'active': False, 'path': None}
         self.assertEqual(no_gpu, {'gpu': None, 'gpuRuntimeReady': False, 'codex': True, 'claude': False, 'wisprFlow': False,
                                   'freeGb': 100.0, 'recommended': 'large-v3-turbo', 'customModel': None,
-                                  'models': {'large-v3': {'gb': 3.1, **absent}, 'large-v3-turbo': {'gb': 1.6, **absent}},
+                                  'models': {'large-v3': {'gb': 3.1, **absent}, 'large-v3-turbo': {'gb': 1.6, **absent},
+                                             'large-v3-turbo-egyptian': {'gb': 1.6, **absent}},
                                   'gpuDownloadGb': 0})
         self.assertEqual((gpu['gpu'], gpu['recommended'], gpu['gpuDownloadGb']), (GPU, 'large-v3', 0.55))
 

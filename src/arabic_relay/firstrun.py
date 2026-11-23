@@ -72,7 +72,7 @@ class SetupJob:
 
     def start(self, name, fresh=False):
         if name not in models.MODELS:
-            raise ValueError('اختار Whisper large-v3 أو large-v3-turbo.')
+            raise ValueError('اختار نموذج Whisper من القائمة.')
         gpu_download = models.gpu_info() is not None and models.gpu_runtime_dir() is None
         target = models.models_dir() / name
         with self.lock:

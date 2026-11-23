@@ -12,8 +12,9 @@ else:
 
 from . import paths, store
 
-HF_REPOS = ('models--Systran--faster-whisper-large-v3', 'models--mobiuslabsgmbh--faster-whisper-large-v3-turbo')
-APP_MODELS = ('large-v3', 'large-v3-turbo')  # downloaded by the app into paths.DATA/models
+HF_REPOS = ('models--Systran--faster-whisper-large-v3', 'models--mobiuslabsgmbh--faster-whisper-large-v3-turbo',
+            'models--Abdallah151--faster-whisper-egyptian-code-switching-large-v3-turbo')
+APP_MODELS = ('large-v3', 'large-v3-turbo', 'large-v3-turbo-egyptian')  # downloaded into paths.DATA/models
 TOOLS = ('codex', 'claude', 'wispr')
 UNINSTALL = r'Software\Microsoft\Windows\CurrentVersion\Uninstall'
 FORMAT_HELP = 'Nuvra محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).'

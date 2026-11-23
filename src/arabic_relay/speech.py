@@ -239,7 +239,7 @@ def delete_model(name=None):
     if name is None:
         return delete_current_model()
     if name not in models.MODELS:
-        raise ValueError('اختار Whisper large-v3 أو large-v3-turbo.')
+        raise ValueError('اختار نموذج Whisper من القائمة.')
     folder, current = models.models_dir() / name, speech_model_path()
     if current is not None and Path(current).resolve() == folder.resolve():
         return delete_current_model()
