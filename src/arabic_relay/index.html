@@ -19,11 +19,12 @@ const RELAY_EN={
  "مسح السجل":"Clear history",
  "صحّح آخر تسجيل":"Correct last dictation",
  "تسجيل الاجتماعات":"Meeting recording",
- "اسألني لو عايز أسجّل لما أدخل اجتماع":"Ask to record when I join a meeting",
+ "اسألني قبل التسجيل":"Ask to record",
+ "يدوي بس":"Manual only",
  "ابدأ الاجتماع":"Start meeting",
  "أوقف التسجيل":"Stop recording",
  "افتح مجلد الاجتماعات":"Open meetings folder",
- "بيسجّل الميكروفون وصوت مخرج Windows الافتراضي، بما فيه صوت المشاركين.":"Records your microphone and everything playing through the default Windows output, including other participants.",
+ "بيسجّل الميكروفون وكل الصوت اللي بيطلع من مخرج Windows الافتراضي.":"Records your microphone and all audio playing through your default Windows output.",
  "التسجيل شغّال":"Recording",
  "التسجيل بيتجهز…":"Starting recording…",
  "بيحفظ التسجيل…":"Saving recording…",
@@ -612,9 +613,9 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
 
  <section class="panel" id="settingsPanel" role="tabpanel" aria-labelledby="settingsButton" hidden><div class="column">
   <section class="group" id="meetingControls" hidden><h2>تسجيل الاجتماعات</h2>
-   <p class="group-help">بيسجّل الميكروفون وصوت مخرج Windows الافتراضي، بما فيه صوت المشاركين.</p>
-   <div class="inline-actions"><button class="btn primary" id="meetingToggle">ابدأ الاجتماع</button><button class="text-btn" id="meetingFolder" hidden>افتح مجلد الاجتماعات</button></div>
-   <label class="choice"><input type="checkbox" id="meetingPrompts"><span>اسألني لو عايز أسجّل لما أدخل اجتماع</span></label>
+   <div class="mode-buttons" role="group" aria-label="تسجيل الاجتماعات"><button class="btn" id="meetingAsk" aria-pressed="false">اسألني قبل التسجيل</button><button class="btn" id="meetingManual" aria-pressed="true">يدوي بس</button></div>
+   <p class="group-help" id="meetingHelp">بيسجّل الميكروفون وكل الصوت اللي بيطلع من مخرج Windows الافتراضي.</p>
+   <div class="inline-actions"><button class="text-btn" id="meetingToggle">ابدأ الاجتماع</button><button class="text-btn" id="meetingFolder" hidden>افتح مجلد الاجتماعات</button></div>
    <p id="meetingStatus" class="group-help" role="status"></p>
   </section>
   <section class="group" id="languageSettings"><h2>اللغة</h2><div class="mode-buttons" role="group" aria-label="لغة البرنامج"><button class="btn" id="languageArabic" lang="ar" aria-pressed="true">العربية</button><button class="btn" id="languageEnglish" lang="en" aria-pressed="false">English</button></div><p class="group-help">بتغيّر لغة البرنامج بس. البرومبت بيفضل بالإنجليزي.</p></section>
@@ -832,10 +833,14 @@ function renderHistory(){
 }
 async function loadHistory(){loadLastDictation();try{const result=await api('/api/history');const same=historyLoaded&&JSON.stringify(result.entries)===JSON.stringify(historyItems);historyItems=result.entries;historyLoaded=true;$('historyMessage').textContent='';if(!same)renderHistory();}catch(e){$('historyMessage').textContent=e.message;}}
 let meetingState='idle',meetingPoll=null,meetingChanging=false,meetingRevision=0;
+let meetingPrompts=false,meetingPromptsSaving=false,meetingPromptsRevision=0;
+function showMeetingPrompts(enabled){
+ meetingPrompts=enabled;
+ $('meetingAsk').setAttribute('aria-pressed',String(enabled));$('meetingManual').setAttribute('aria-pressed',String(!enabled));
+}
 function showMeeting(m){
  clearTimeout(meetingPoll);meetingState=m.state;
  const running=['recording','starting','stopping'].includes(m.state);
- if(typeof m.promptsEnabled==='boolean'&&!$('meetingPrompts').disabled)$('meetingPrompts').checked=m.promptsEnabled;
  $('meetingControls').hidden=!m.available&&!running&&!m.id;
  $('meetingToggle').disabled=meetingChanging||m.state==='starting'||m.state==='stopping'||(!m.available&&!running);
  $('meetingToggle').textContent=running?tr('أوقف التسجيل'):tr('ابدأ الاجتماع');
@@ -849,8 +854,13 @@ function showMeeting(m){
 }
 async function refreshMeeting(){
  if(quickCapture||meetingChanging)return;
- const version=++meetingRevision;
- try{const m=await api('/api/meetings');if(version===meetingRevision&&m.state)showMeeting(m);}
+ const version=++meetingRevision,promptsRevision=meetingPromptsRevision;
+ try{
+  const m=await api('/api/meetings');
+  if(version!==meetingRevision||!m.state)return;
+  showMeeting(m);
+  if(typeof m.promptsEnabled==='boolean'&&!meetingPromptsSaving&&promptsRevision===meetingPromptsRevision)showMeetingPrompts(m.promptsEnabled);
+ }
  catch{if(version===meetingRevision&&meetingState==='recording'){clearTimeout(meetingPoll);$('meetingStatus').textContent=tr('تعذّر تحديث حالة التسجيل.');meetingPoll=setTimeout(refreshMeeting,3000);}}
 }
 $('meetingToggle').addEventListener('click',async()=>{
@@ -861,12 +871,16 @@ $('meetingToggle').addEventListener('click',async()=>{
  catch(e){meetingChanging=false;$('meetingToggle').disabled=false;await refreshMeeting();$('meetingStatus').textContent=e.message;}
 });
 $('meetingFolder').addEventListener('click',async()=>{try{await window.pywebview.api.open_meetings_folder(csrf);}catch(e){notice(e.message);}});
-$('meetingPrompts').addEventListener('change',async()=>{
- const field=$('meetingPrompts'),enabled=field.checked;field.disabled=true;
- try{const result=await api('/api/meetings/prompts',{enabled});field.checked=result.enabled;}
- catch(e){field.checked=!enabled;notice(e.message);}
- finally{field.disabled=false;}
-});
+// The buttons stay enabled while saving so keyboard focus is kept; clicks made meanwhile are ignored.
+async function chooseMeetingPrompts(enabled){
+ if(meetingPromptsSaving||enabled===meetingPrompts)return;
+ meetingPromptsSaving=true;showMeetingPrompts(enabled);
+ try{const result=await api('/api/meetings/prompts',{enabled});showMeetingPrompts(result.enabled);}
+ catch(e){showMeetingPrompts(!enabled);notice(e.message);}
+ finally{meetingPromptsRevision++;meetingPromptsSaving=false;}
+}
+$('meetingAsk').addEventListener('click',()=>chooseMeetingPrompts(true));
+$('meetingManual').addEventListener('click',()=>chooseMeetingPrompts(false));
 // Correct last dictation: the words heard in one recording, never the pasted text. It appears only while local speech
 // learning is on and the server still holds that recording. A newer dictation never replaces words being corrected here.
 let correctId=null,correctSource='',correctSaving=false;

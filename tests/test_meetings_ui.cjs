@@ -15,11 +15,13 @@ const {boot, flush} = require('./test_translation_ui.cjs');
   const base = ctx.fetch, requests = [];
   let state = {state: 'idle', available: true, promptsEnabled: false};
   let failPreference = false;
+  let preferenceGate, releasePreference, statusGate, releaseStatus;
   let startGate, releaseStart;
   ctx.fetch = async (url, options) => {
     if (!url.startsWith('/api/meetings')) return base(url, options);
     requests.push({url, body: options?.body && JSON.parse(options.body)});
     if (url === '/api/meetings/prompts') {
+      await preferenceGate;
       if (failPreference) return {ok: false, json: async () => ({error: 'Could not save preference'})};
       const {enabled} = JSON.parse(options.body);
       state = {...state, promptsEnabled: enabled};
@@ -30,7 +32,9 @@ const {boot, flush} = require('./test_translation_ui.cjs');
       state = {state: 'recording', available: true, id: 'local-session', seconds: 65};
     }
     if (url === '/api/meetings/stop') state = {state: 'stopped', available: true, id: 'local-session'};
-    return {ok: true, json: async () => state};
+    const snapshot = state;
+    if (url === '/api/meetings') await statusGate;
+    return {ok: true, json: async () => snapshot};
   };
   await flush();
   await field('settingsButton').click();
@@ -40,16 +44,34 @@ const {boot, flush} = require('./test_translation_ui.cjs');
   assert.equal(field('meetingControls').hidden, false);
   assert.equal(field('meetingToggle').disabled, false);
   assert.ok(requests.every(r => r.url === '/api/meetings'), 'opening the app or Settings must not record');
-  const prompts = field('meetingPrompts');
-  assert.equal(prompts.checked, false);
-  prompts.checked = true;
-  await prompts.listeners.change();
-  assert.equal(prompts.checked, true);
+  const ask = field('meetingAsk'), manual = field('meetingManual');
+  function expectMode(automaticPrompt) {
+    assert.equal(ask.getAttribute('aria-pressed'), String(automaticPrompt));
+    assert.equal(manual.getAttribute('aria-pressed'), String(!automaticPrompt));
+  }
+  expectMode(false);
+  await manual.click();
+  preferenceGate = new Promise(resolve => { releasePreference = resolve; });
+  const saving = ask.click();
+  expectMode(true);
+  await manual.click();
+  await ctx.refreshMeeting();
+  expectMode(true);
+  statusGate = new Promise(resolve => { releaseStatus = resolve; });
+  const oldStatus = ctx.refreshMeeting();
+  releasePreference();
+  await saving;
+  releaseStatus();
+  await oldStatus;
+  expectMode(true);
   failPreference = true;
-  prompts.checked = false;
-  await prompts.listeners.change();
-  assert.equal(prompts.checked, true);
-  assert.equal(prompts.disabled, false);
+  await manual.click();
+  expectMode(true);
+  failPreference = false;
+  await manual.click();
+  expectMode(false);
+  assert.deepEqual(requests.filter(r => r.url.endsWith('/prompts')).map(r => r.body.enabled),
+    [true, false, false]);
   assert.deepEqual(requests.filter(r => r.url.endsWith('/start')), []);
   startGate = new Promise(resolve => { releaseStart = resolve; });
   const starting = field('meetingToggle').click();
