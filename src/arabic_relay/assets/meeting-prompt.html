@@ -25,7 +25,7 @@ el('question').textContent=ar?'تسجّل اجتماع '+app+'؟':'Record this '
 el('detail').textContent=ar?'هتسجّل الميكروفون وصوت الجهاز.':'Nuvra will record your microphone and Windows playback.';
 el('dismiss').textContent=ar?'تجاهل':'Dismiss';el('record').textContent=ar?'تسجيل':'Record';
 function buttons(disabled){el('record').disabled=disabled;el('dismiss').disabled=disabled;}
-function failed(){el('detail').textContent=ar?'ما قدرناش نبدأ التسجيل. جرّب تاني أو افتح السجل.':'Couldn’t start recording. Try again or open History.';buttons(false);}
+function failed(){el('detail').textContent=ar?'ما قدرناش نبدأ التسجيل. جرّب تاني أو افتح الإعدادات.':'Couldn’t start recording. Try again or open Settings.';buttons(false);}
 window.promptFailed=failed;
 async function choose(action){
  if(el('record').disabled)return;

@@ -1,7 +1,13 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const {boot, flush} = require('./test_translation_ui.cjs');
 
 (async () => {
+  const html = fs.readFileSync(path.join(__dirname, '../src/arabic_relay/index.html'), 'utf8');
+  const panels = html.split(/(?=<section\b[^>]*role="tabpanel")/);
+  assert.deepEqual(panels.filter(panel => panel.includes('id="meetingControls"')).map(panel =>
+    panel.match(/^<section\b[^>]*\bid="([^"]+)"/)?.[1]), ['settingsPanel']);
   const app = boot({status: {speechLearning: 'automatic'}, language: 'en'});
   const field = id => app.nodes.get(id);
   const ctx = app.context;
@@ -27,11 +33,13 @@ const {boot, flush} = require('./test_translation_ui.cjs');
     return {ok: true, json: async () => state};
   };
   await flush();
-  await field('historyButton').click();
+  await field('settingsButton').click();
   await flush();
+  assert.equal(field('settingsPanel').hidden, false);
+  assert.equal(field('historyPanel').hidden, true);
   assert.equal(field('meetingControls').hidden, false);
   assert.equal(field('meetingToggle').disabled, false);
-  assert.ok(requests.every(r => r.url === '/api/meetings'), 'opening the app or History must not record');
+  assert.ok(requests.every(r => r.url === '/api/meetings'), 'opening the app or Settings must not record');
   const prompts = field('meetingPrompts');
   assert.equal(prompts.checked, false);
   prompts.checked = true;

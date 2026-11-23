@@ -578,12 +578,6 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
  <header class="topbar"><div class="brand" dir="ltr">Nuvra</div><div class="tabs" id="tabs" role="tablist" aria-label="أقسام البرنامج"><button class="tab" role="tab" id="historyButton" aria-controls="historyPanel" aria-selected="true">السجل</button><button class="tab" role="tab" id="modelsButton" aria-controls="modelsPanel" aria-selected="false" tabindex="-1">النماذج</button><button class="tab" role="tab" id="settingsButton" aria-controls="settingsPanel" aria-selected="false" tabindex="-1">الإعدادات</button></div><div class="top-key" id="topKey" hidden><span>اختصار التسجيل</span><kbd class="keycap mono" id="topShortcut" dir="ltr">Ctrl + Alt + Space</kbd></div></header>
  <div class="panels">
  <section class="panel" id="historyPanel" role="tabpanel" aria-labelledby="historyButton"><div class="column">
-  <section class="group" id="meetingControls" hidden><h2>تسجيل الاجتماعات</h2>
-   <p class="group-help">بيسجّل الميكروفون وصوت مخرج Windows الافتراضي، بما فيه صوت المشاركين.</p>
-   <div class="inline-actions"><button class="btn primary" id="meetingToggle">ابدأ الاجتماع</button><button class="text-btn" id="meetingFolder" hidden>افتح مجلد الاجتماعات</button></div>
-   <label class="choice"><input type="checkbox" id="meetingPrompts"><span>اسألني لو عايز أسجّل لما أدخل اجتماع</span></label>
-   <p id="meetingStatus" class="group-help" role="status"></p>
-  </section>
   <p class="panel-intro">آخر 10 نص. نص بس، محفوظ على جهازك.</p>
   <p class="history-message" id="historyMessage" role="status" aria-live="polite"></p>
   <details class="setting-block" id="correctLast" hidden><summary>صحّح آخر تسجيل</summary><label for="correctLastText"><span>الكلام زي ما اتسمع</span> · <time id="correctLastTime"></time></label><textarea class="field" id="correctLastText" dir="auto" maxlength="8000" rows="3" aria-describedby="correctLastHelp"></textarea><p class="group-help" id="correctLastHelp">صحّحه أو اكتبه من الأول زي ما اتقال بالظبط. لما تحفظ، الصوت والنص بيتحفظوا على جهازك لتدريب نموذج الكلام.</p><div class="inline-actions"><button class="btn" id="correctLastSave" disabled>احفظ التصحيح</button><button class="text-btn" id="correctLastCancel">إلغاء</button></div></details>
@@ -617,6 +611,12 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
  </div></section>
 
  <section class="panel" id="settingsPanel" role="tabpanel" aria-labelledby="settingsButton" hidden><div class="column">
+  <section class="group" id="meetingControls" hidden><h2>تسجيل الاجتماعات</h2>
+   <p class="group-help">بيسجّل الميكروفون وصوت مخرج Windows الافتراضي، بما فيه صوت المشاركين.</p>
+   <div class="inline-actions"><button class="btn primary" id="meetingToggle">ابدأ الاجتماع</button><button class="text-btn" id="meetingFolder" hidden>افتح مجلد الاجتماعات</button></div>
+   <label class="choice"><input type="checkbox" id="meetingPrompts"><span>اسألني لو عايز أسجّل لما أدخل اجتماع</span></label>
+   <p id="meetingStatus" class="group-help" role="status"></p>
+  </section>
   <section class="group" id="languageSettings"><h2>اللغة</h2><div class="mode-buttons" role="group" aria-label="لغة البرنامج"><button class="btn" id="languageArabic" lang="ar" aria-pressed="true">العربية</button><button class="btn" id="languageEnglish" lang="en" aria-pressed="false">English</button></div><p class="group-help">بتغيّر لغة البرنامج بس. البرومبت بيفضل بالإنجليزي.</p></section>
   <section class="group"><h2>طريقة الكتابة</h2><div class="mode-buttons" role="group" aria-label="طريقة الكتابة"><button class="btn" id="craftMode" aria-pressed="true">برومبت منظّم</button><button class="btn" id="inlineMode" aria-pressed="false">ترجمة العربي بس</button></div><p class="group-help" id="modeHelp"></p></section>
   <section class="group" id="shortcutSettings" hidden><h2>الاختصار</h2><div class="setting"><label for="shortcutChoice">اختصار التسجيل</label><select id="shortcutChoice" dir="ltr"><option value="ctrl-alt-space">Ctrl + Alt + Space</option><option value="ctrl-alt-r">Ctrl + Alt + R</option><option value="ctrl-shift-space">Ctrl + Shift + Space</option></select></div><p class="group-help" id="shortcutHelp" role="status">سيب البرنامج مفتوح أو متصغّر. الاختصار بيبدأ التسجيل وبيوقفه.</p><p class="group-help" id="shortcutStatus" hidden></p><p class="group-help" id="captureKeysHelp">أثناء التسجيل: {finish} لإنهاء التسجيل واللصق، وEsc للإلغاء.</p></section>
@@ -851,7 +851,7 @@ async function refreshMeeting(){
  if(quickCapture||meetingChanging)return;
  const version=++meetingRevision;
  try{const m=await api('/api/meetings');if(version===meetingRevision&&m.state)showMeeting(m);}
- catch{if(version===meetingRevision&&meetingState==='recording'){$('meetingStatus').textContent=tr('تعذّر تحديث حالة التسجيل.');meetingPoll=setTimeout(refreshMeeting,3000);}}
+ catch{if(version===meetingRevision&&meetingState==='recording'){clearTimeout(meetingPoll);$('meetingStatus').textContent=tr('تعذّر تحديث حالة التسجيل.');meetingPoll=setTimeout(refreshMeeting,3000);}}
 }
 $('meetingToggle').addEventListener('click',async()=>{
  if(meetingChanging)return;
@@ -973,6 +973,7 @@ function selectTab(name){
  for(const key of Object.keys(TABS)){const on=key===name;$(TABS[key]).setAttribute('aria-selected',String(on));$(TABS[key]).tabIndex=on?0:-1;$(PANELS[key]).hidden=!on;}
  if(name!=='models')$('cohereKey').value='';
  if(name==='history')loadHistory();
+ if(name==='settings'&&speechLearning)refreshMeeting();
  if(name==='models'){loadModels();loadTranslators();loadLocalTranslator();pollLocalPull();}
 }
 window.relayShowTab=selectTab;
