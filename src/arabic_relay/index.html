@@ -19,6 +19,7 @@ const RELAY_EN={
  "مسح السجل":"Clear history",
  "صحّح آخر تسجيل":"Correct last dictation",
  "تسجيل الاجتماعات":"Meeting recording",
+ "اسألني لو عايز أسجّل لما أدخل اجتماع":"Ask to record when I join a meeting",
  "ابدأ الاجتماع":"Start meeting",
  "أوقف التسجيل":"Stop recording",
  "افتح مجلد الاجتماعات":"Open meetings folder",
@@ -580,6 +581,7 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
   <section class="group" id="meetingControls" hidden><h2>تسجيل الاجتماعات</h2>
    <p class="group-help">بيسجّل الميكروفون وصوت مخرج Windows الافتراضي، بما فيه صوت المشاركين.</p>
    <div class="inline-actions"><button class="btn primary" id="meetingToggle">ابدأ الاجتماع</button><button class="text-btn" id="meetingFolder" hidden>افتح مجلد الاجتماعات</button></div>
+   <label class="choice"><input type="checkbox" id="meetingPrompts"><span>اسألني لو عايز أسجّل لما أدخل اجتماع</span></label>
    <p id="meetingStatus" class="group-help" role="status"></p>
   </section>
   <p class="panel-intro">آخر 10 نص. نص بس، محفوظ على جهازك.</p>
@@ -833,6 +835,7 @@ let meetingState='idle',meetingPoll=null,meetingChanging=false,meetingRevision=0
 function showMeeting(m){
  clearTimeout(meetingPoll);meetingState=m.state;
  const running=['recording','starting','stopping'].includes(m.state);
+ if(typeof m.promptsEnabled==='boolean'&&!$('meetingPrompts').disabled)$('meetingPrompts').checked=m.promptsEnabled;
  $('meetingControls').hidden=!m.available&&!running&&!m.id;
  $('meetingToggle').disabled=meetingChanging||m.state==='starting'||m.state==='stopping'||(!m.available&&!running);
  $('meetingToggle').textContent=running?tr('أوقف التسجيل'):tr('ابدأ الاجتماع');
@@ -858,6 +861,12 @@ $('meetingToggle').addEventListener('click',async()=>{
  catch(e){meetingChanging=false;$('meetingToggle').disabled=false;await refreshMeeting();$('meetingStatus').textContent=e.message;}
 });
 $('meetingFolder').addEventListener('click',async()=>{try{await window.pywebview.api.open_meetings_folder(csrf);}catch(e){notice(e.message);}});
+$('meetingPrompts').addEventListener('change',async()=>{
+ const field=$('meetingPrompts'),enabled=field.checked;field.disabled=true;
+ try{const result=await api('/api/meetings/prompts',{enabled});field.checked=result.enabled;}
+ catch(e){field.checked=!enabled;notice(e.message);}
+ finally{field.disabled=false;}
+});
 // Correct last dictation: the words heard in one recording, never the pasted text. It appears only while local speech
 // learning is on and the server still holds that recording. A newer dictation never replaces words being corrected here.
 let correctId=null,correctSource='',correctSaving=false;

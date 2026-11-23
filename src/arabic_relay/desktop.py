@@ -16,7 +16,7 @@ os.environ['ARABIC_RELAY_NATIVE'] = '1'
 
 import webview
 
-from . import diagnostics, server, locate, meetings, paths, speech, store, t3, updates, paste, history, inline
+from . import diagnostics, server, locate, meeting_prompt, meetings, paths, speech, store, t3, updates, paste, history, inline
 from .hotkey import RecordingHotkey, CaptureHotkeys
 
 if sys.platform == 'darwin':
@@ -99,6 +99,60 @@ def history_changed():
         except Exception:
             logging.debug('The main window did not refresh History', exc_info=True)
     threading.Thread(target=tell, daemon=True).start()
+
+
+class MeetingPromptApi:
+    def __init__(self, send, token):
+        self._send, self._token = send, token
+
+    def choose(self, action, token):
+        if token != self._token or action not in ('record', 'dismiss'):
+            raise ValueError('Invalid meeting prompt.')
+        self._send(action, token)
+
+
+class MeetingPromptWindow:
+    def __init__(self, app, token, send):
+        screens = webview.screens
+        screen = next((s for s in screens if s.x == 0 and s.y == 0), screens[0])
+        scale = ctypes.windll.user32.GetDpiForSystem() / 96
+        width, height = 388, 212
+        fragment = urllib.parse.urlencode({'app': app, 'token': token})
+        self.window = webview.create_window(
+            'Nuvra · Meeting', server.ORIGIN + '/meeting-prompt#' + fragment, js_api=MeetingPromptApi(send, token),
+            width=width, height=height, min_size=(320, 170), resizable=False, on_top=True, focus=False,
+            x=int((screen.x + screen.width) / scale) - width - 18,
+            y=int((screen.y + screen.height) / scale) - height - 64,
+            frameless=True, easy_drag=False, background_color='#151719')
+        self.window.events.closed += lambda: send('dismiss', token)
+
+    def close(self):
+        if self.window in webview.windows:
+            self.window.destroy()
+
+    def failed(self):
+        if self.window in webview.windows:
+            self.window.evaluate_js('window.promptFailed?.()')
+
+
+def make_meeting_monitor():
+    from . import meeting_detection
+
+    def available():
+        status = meetings.status()
+        return status['available'] and status['state'] in ('idle', 'stopped', 'error') and not meetings.active()
+
+    def record():
+        server.start_meeting(microphone=True, speakers=True)
+        if webview.windows:
+            try:
+                webview.windows[0].evaluate_js('void window.refreshMeeting?.()')
+            except Exception:
+                logging.debug('Could not refresh meeting status in the main window')
+
+    monitor = meeting_prompt.PromptMonitor(meeting_prompt.enabled, available, meeting_detection.detect,
+                                          lambda app, token: MeetingPromptWindow(app, token, monitor.action), record)
+    return monitor
 
 
 class QuickCapture:
@@ -397,6 +451,7 @@ def run():
     httpd = server.bind(server.PORT)
     (paths.DATA / 'instance.json').write_text(json.dumps({'pid': os.getpid(), 'port': httpd.server_address[1]}), encoding='utf-8')
     capture = QuickCapture(store.get_setting('capture_shortcut', 'ctrl-alt-space'))
+    monitor = make_meeting_monitor() if sys.platform == 'win32' else None
     try:
         meetings.recover()
         threading.Thread(target=httpd.serve_forever, daemon=True).start()
@@ -404,11 +459,16 @@ def run():
                              width=900, height=680, min_size=(640, 520),
                              background_color='#08090a', text_select=True)
         window.events.closed += capture.stop
+        if monitor:
+            window.events.loaded += monitor.start
+            window.events.closed += monitor.stop
         window.events.loaded += speech.prewarm   # only when the user asked for it; never blocks the window
         webview.start(capture.hotkey.start, gui='cocoa' if sys.platform == 'darwin' else 'edgechromium', private_mode=False,
                       storage_path=str(paths.DATA / 'NativeWebView'),
                       icon=str(server.ROOT / ('assets/icon.png' if sys.platform == 'darwin' else 'assets/relay.ico')))
     finally:
+        if monitor:
+            monitor.stop()
         meetings.shutdown()
         capture.stop()
         speech.cancel_preparation()

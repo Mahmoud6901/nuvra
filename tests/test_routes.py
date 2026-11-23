@@ -75,6 +75,27 @@ class Routes(unittest.TestCase):
             self.assertEqual(self.status('POST', route, selected), 400)
             start.assert_not_called()
 
+    def test_prompt_preference_status_round_trips_without_opening_recording_devices(self):
+        def current():
+            conn = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+            try:
+                conn.request('GET', '/api/meetings')
+                return json.loads(conn.getresponse().read())['promptsEnabled']
+            finally:
+                conn.close()
+
+        with patch.object(server.meetings, 'status', return_value={'available': True, 'state': 'idle'}), \
+                patch.object(server.meetings, 'start') as start:
+            self.assertIs(current(), False)
+            route = '/api/meetings/prompts'
+            self.assertEqual(self.status('POST', route, {'enabled': True}, token='wrong'), 403)
+            self.assertEqual(self.status('POST', route, {'enabled': 'true'}), 400)
+            self.assertIs(current(), False)
+            for enabled in (True, False):
+                self.assertEqual(self.status('POST', route, {'enabled': enabled}), 200)
+                self.assertIs(current(), enabled)
+            start.assert_not_called()
+
     def test_every_interface_route_is_handled(self):
         html = (paths.ROOT / 'index.html').read_text(encoding='utf-8')
         routes = sorted(set(re.findall(r"""['"`](/api/[a-z/-]+)""", html)))

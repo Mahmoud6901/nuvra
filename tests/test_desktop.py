@@ -9,6 +9,10 @@ from arabic_relay import desktop
 
 
 class DesktopLifecycle(unittest.TestCase):
+    def setUp(self):
+        self.monitor = MagicMock()
+        self.enterContext(patch.object(desktop, 'make_meeting_monitor', return_value=self.monitor))
+
     def test_native_host_owns_window_and_server(self):
         httpd = MagicMock(server_address=('127.0.0.1', 8791))
         with tempfile.TemporaryDirectory() as folder, patch.object(desktop.paths, 'DATA', Path(folder)), \
@@ -23,6 +27,7 @@ class DesktopLifecycle(unittest.TestCase):
         self.assertFalse(start.call_args.kwargs['private_mode'])
         httpd.shutdown.assert_called_once()
         httpd.server_close.assert_called_once()
+        self.monitor.stop.assert_called_once()
 
     def test_session_sign_in_bridge_is_removed(self):
         with patch.object(desktop.webbrowser, 'open') as opened:
@@ -47,6 +52,7 @@ class Updates(unittest.TestCase):
         httpd.shutdown.side_effect = lambda: order.append('shutdown')
         with tempfile.TemporaryDirectory() as folder, patch.object(desktop.paths, 'DATA', Path(folder)), \
                 patch.object(desktop.server, 'bind', return_value=httpd), patch.object(desktop.webview, 'create_window'), \
+                patch.object(desktop, 'make_meeting_monitor', return_value=None), \
                 patch.object(desktop.webview, 'start'), \
                 patch.object(desktop.updates, 'install_on_quit', side_effect=lambda: order.append('install')), \
                 patch.object(desktop.updates, 'start_background') as background:

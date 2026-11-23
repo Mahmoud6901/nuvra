@@ -17,11 +17,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import __version__, aliases, direct_sessions, diagnostics, firstrun, history, locate, paths, speech, speech_learning, store, t3, translate, translators, updates
 from . import inline, local_translator, meetings
+from . import meeting_prompt
 
 ROOT = paths.ROOT
 PORT = int(os.environ.get('ARABIC_RELAY_PORT', '8788'))
 ORIGIN = f'http://127.0.0.1:{PORT}'
 CSRF = secrets.token_urlsafe(32)
+
+
+def start_meeting(microphone, speakers):
+    if type(microphone) is not bool or type(speakers) is not bool or not (microphone or speakers):
+        raise ValueError('اختار مصدر صوت للاجتماع.')
+    model = speech.speech_model_path()
+    if model is None:
+        raise ValueError('اختار نموذج Whisper من تبويب النماذج.')
+    return meetings.start(model, microphone=microphone, speakers=speakers)
 
 
 def catalog_response():
@@ -78,6 +88,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond((ROOT / 'index.html').read_bytes(), content_type='text/html; charset=utf-8')
             if path.path == '/icon.png':
                 return self.respond((ROOT / 'assets/icon.png').read_bytes(), content_type='image/png')
+            if path.path == '/meeting-prompt':
+                return self.respond((ROOT / 'assets/meeting-prompt.html').read_bytes(), content_type='text/html; charset=utf-8')
             if path.path == '/pcm-capture.js':
                 return self.respond((ROOT / 'assets/pcm-capture.js').read_bytes(), content_type='text/javascript; charset=utf-8')
             if path.path == '/fonts/InterVariable.woff2':
@@ -105,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
             if path.path == '/api/speech-learning/last':
                 return self.respond(speech_learning.last())
             if path.path == '/api/meetings':
-                return self.respond(meetings.status())
+                return self.respond({**meetings.status(), 'promptsEnabled': meeting_prompt.enabled()})
             if path.path == '/api/history':
                 return self.respond(history.entries())
             if path.path == '/api/translators':
@@ -248,15 +260,11 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/speech-learning/correct':
                 return self.respond(speech_learning.correct(body.get('id'), body.get('text')))
             if self.path == '/api/meetings/start':
-                mic, speakers = body.get('microphone'), body.get('speakers')
-                if type(mic) is not bool or type(speakers) is not bool or not (mic or speakers):
-                    raise ValueError('اختار مصدر صوت للاجتماع.')
-                model = speech.speech_model_path()
-                if model is None:
-                    raise ValueError('اختار نموذج Whisper من تبويب النماذج.')
-                return self.respond(meetings.start(model, microphone=mic, speakers=speakers))
+                return self.respond(start_meeting(body.get('microphone'), body.get('speakers')))
             if self.path == '/api/meetings/stop':
                 return self.respond(meetings.stop())
+            if self.path == '/api/meetings/prompts':
+                return self.respond(meeting_prompt.set_enabled(body.get('enabled')))
             if self.path == '/api/history/delete':
                 return self.respond(history.delete(body.get('id')))
             if self.path == '/api/history/clear':

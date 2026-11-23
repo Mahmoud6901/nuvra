@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nuvra · Meeting</title>
+<style>
+@font-face{font-family:Inter;src:url('/fonts/InterVariable.woff2')}
+*{box-sizing:border-box}
+:root{color-scheme:dark;--bg:#151719;--text:#f4f4f5;--muted:#adb0b5;--button:#303339;--primary:#e9ebee;--ink:#17191d}
+:root.light{color-scheme:light;--bg:#fafafa;--text:#1c1c20;--muted:#5c6068;--button:#e5e6e9;--primary:#26292f;--ink:#fff}
+body{background:var(--bg);color:var(--text);font:14px/1.4 Inter,'Segoe UI',sans-serif;margin:0;padding:16px 18px}
+header{display:flex;align-items:center;gap:7px;font-weight:650}header img{width:19px;height:19px;border-radius:5px}
+h1{font-size:17px;line-height:1.35;margin:10px 0 4px}p{color:var(--muted);margin:0;font-size:13px}
+footer{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+button{background:var(--button);color:var(--text);border:0;border-radius:7px;padding:7px 13px;font:inherit;cursor:pointer}
+#record{background:var(--primary);color:var(--ink);font-weight:600}button:focus-visible{outline:2px solid #629ef9;outline-offset:2px}button:disabled{opacity:.6}
+</style></head>
+<body><header><img src="/icon.png" alt="">Nuvra</header><h1 id="question"></h1><p id="detail" role="status"></p>
+<footer><button id="dismiss" disabled></button><button id="record" disabled></button></footer>
+<script>
+const params=new URLSearchParams(location.hash.slice(1)), token=params.get('token');
+const ar=localStorage.getItem('relay-language')==='ar';
+document.documentElement.lang=ar?'ar':'en';document.documentElement.dir=ar?'rtl':'ltr';
+document.documentElement.classList.toggle('light',localStorage.getItem('relay-theme')==='light');
+const app=params.get('app')||'', el=id=>document.getElementById(id);
+el('question').textContent=ar?'تسجّل اجتماع '+app+'؟':'Record this '+app+' meeting?';
+el('detail').textContent=ar?'هتسجّل الميكروفون وصوت الجهاز.':'Nuvra will record your microphone and Windows playback.';
+el('dismiss').textContent=ar?'تجاهل':'Dismiss';el('record').textContent=ar?'تسجيل':'Record';
+function buttons(disabled){el('record').disabled=disabled;el('dismiss').disabled=disabled;}
+function failed(){el('detail').textContent=ar?'ما قدرناش نبدأ التسجيل. جرّب تاني أو افتح السجل.':'Couldn’t start recording. Try again or open History.';buttons(false);}
+window.promptFailed=failed;
+async function choose(action){
+ if(el('record').disabled)return;
+ buttons(true);
+ if(action==='record')el('detail').textContent=ar?'التسجيل بيتجهز…':'Starting recording…';
+ try{await window.pywebview.api.choose(action,token);}catch{failed();}
+}
+el('record').onclick=()=>choose('record');el('dismiss').onclick=()=>choose('dismiss');
+document.addEventListener('keydown',e=>{if(e.key==='Escape')choose('dismiss');});
+window.addEventListener('pywebviewready',()=>buttons(false));
+if(window.pywebview?.api?.choose)buttons(false);
+</script></body></html>
