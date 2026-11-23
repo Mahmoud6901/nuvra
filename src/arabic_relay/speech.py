@@ -666,18 +666,16 @@ def stream_chunk(job_id, seq, payload):
         raise
 
 
-WHOLE_READING_SECONDS = 12
-
-
 def stream_finish(job_id, last_seq, total_samples):
     if type(last_seq) is not int or type(total_samples) is not int:
         raise ValueError('طلب التسجيل مش صحيح.')
     job = incremental.REGISTRY.get(job_id)
     stopped = time.monotonic()
     try:
-        # One reading of the whole recording keeps Arabic words that passes lose in mixed speech. It takes over 1.4 s
-        # beyond WHOLE_READING_SECONDS, and far longer on a CPU, so those recordings keep what their passes read.
-        whole = job.on_gpu() and total_samples <= WHOLE_READING_SECONDS * incremental.RATE
+        # The Egyptian Turbo model can recover a conditional lost in the live passes by hearing the whole
+        # utterance in one Whisper window (30 s). Keep the shorter stop-time budget for the other models.
+        whole_seconds = 30 if models.is_egyptian_turbo(job.key[0]) else 12
+        whole = job.on_gpu() and total_samples <= whole_seconds * incremental.RATE
         result, reason = job.finish(total_samples, last_seq, timeout=90, whole=whole)
         planned = reason == incremental.WHOLE_READING
         if result is None:

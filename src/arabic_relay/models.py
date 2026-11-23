@@ -66,9 +66,14 @@ def gpu_runtime_dir():
                  if (folder / 'cublas64_12.dll').is_file() and (folder / 'cublasLt64_12.dll').is_file()), None)
 
 
+def is_egyptian_turbo(folder):
+    name = str(folder).lower()
+    return 'large-v3-turbo-egyptian' in name or 'egyptian-code-switching-large-v3-turbo' in name
+
+
 def model_label(folder):
     name = str(folder).lower()
-    if 'large-v3-turbo-egyptian' in name or 'egyptian-code-switching-large-v3-turbo' in name:
+    if is_egyptian_turbo(folder):
         return 'Whisper large-v3-turbo-egyptian'
     if 'large-v3-turbo' in name:
         return 'Whisper large-v3-turbo'

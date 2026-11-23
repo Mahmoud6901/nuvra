@@ -97,6 +97,19 @@ class StreamRoutes(unittest.TestCase):
         self.assertEqual(body['timings']['path'], 'incremental-whole')
         self.assertFalse(speech.TRANSCRIBE_LOCK.locked())
 
+    def test_egyptian_turbo_finishes_a_fifteen_second_utterance_with_its_full_context(self):
+        self.audio = self.recognizer.audio = scripted_audio(15)
+        folder = Path('models/large-v3-turbo-egyptian')
+        for mode in (False, True):
+            job = 'egyptian-full-context-' + str(mode)
+            with patch.object(speech, 'speech_model_path', return_value=folder):
+                last = self.record(job, inline=mode)
+            with patch.object(speech, 'engine_request', return_value={'text': 'لو جاتلك فرصة تسافر'}) as whole:
+                status, body = self.post('/api/stream/finish', {'jobId': job, 'lastSeq': last, 'totalSamples': len(self.audio) // 2})
+            self.assertEqual(status, 200, body)
+            self.assertEqual(body['timings']['path'], 'incremental-whole')
+            self.assertEqual(whole.call_args.args[2], self.audio)
+
     def finish_with_reading(self, job, last, segments):
         reading = {'text': 'x', 'device': 'GPU', 'segments': segments, 'seconds': 9.0}
         with patch.object(speech, 'engine_request', return_value=reading):
