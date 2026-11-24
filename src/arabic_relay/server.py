@@ -104,6 +104,8 @@ class Handler(BaseHTTPRequestHandler):
                                      **speech.status(), 'setupNeeded': firstrun.setup_needed(),
                                      'wisprFlowInstalled': locate.tool_path('wispr') is not None,
                                      'cohereConfigured': (paths.DATA / 'cohere.bin').is_file(),
+                                     'geminiConfigured': (paths.DATA / 'gemini.bin').is_file(),
+                                     **speech.granola_status(), 'platform': sys.platform,
                                      'selfLearning': store.self_learning_enabled(),
                                      'speechLearning': speech_learning.mode(),
                                      'autoSpelling': store.auto_spelling_enabled(),
@@ -189,7 +191,8 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('طلب التسجيل مش صحيح.')
                 return self.respond(speech.cancel_preparation(body['requestId']))
             if self.path == '/api/stream/start':
-                return self.respond(speech.stream_start(body.get('jobId'), body.get('inline', False), body.get('vocabulary', '')))
+                return self.respond(speech.stream_start(body.get('jobId'), body.get('inline', False), body.get('vocabulary', ''),
+                                                         body.get('provider', 'whisper')))
             if self.path == '/api/stream/finish':
                 return self.respond(speech.stream_finish(body.get('jobId'), body.get('lastSeq'), body.get('totalSamples')))
             if self.path == '/api/stream/cancel':
@@ -199,6 +202,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/api/engine':
                 return self.respond(speech.set_engine_settings(body.get('idleSeconds'), body.get('prewarm'),
                                                                body.get('retryGpu') is True, body.get('spokenLanguage')))
+            if self.path == '/api/granola/open':
+                return self.respond(speech.open_granola())
             if self.path == '/api/wispr/open':
                 return self.respond(speech.open_wispr_flow())
             if self.path == '/api/whisper-model':
@@ -225,6 +230,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'text': diagnostics.report()})
             if self.path == '/api/crash/dismiss':
                 return self.respond(diagnostics.dismiss_crash())
+            if self.path == '/api/gemini/key':
+                return self.respond(speech.save_gemini_key(body.get('key')))
             if self.path == '/api/cohere/key':
                 return self.respond(speech.save_cohere_key(body.get('key')))
             if self.path == '/api/restore-english':

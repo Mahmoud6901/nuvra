@@ -23,7 +23,9 @@ if sys.platform == 'darwin':
     from .macos import RecordingHotkey, CaptureHotkeys
 
 
-PILL = {'capture': (147, 40), 'message': (400, 60)}   # logical pixels; the page's pill fills the window exactly
+# Logical pixels; the page's pill fills the window exactly. 'live' shows the words Gemini hears as they come; 'guide'
+# says how to dictate with Granola.
+PILL = {'capture': (147, 40), 'message': (400, 60), 'live': (420, 60), 'guide': (300, 40)}
 FRAME = 0 if sys.platform == 'darwin' else 16  # WinForms frameless window adjustment
 HISTORY_KEPT = 'اتنسخ، ما اتلصقش'
 
@@ -64,7 +66,7 @@ def leave_keyboard_alone(window):
 
 
 def take_keyboard(window):
-    """Wispr Flow types into the pill, so with Flow alone the pill needs the keyboard."""
+    """Wispr Flow and Granola put their text in the pill, so with them alone the pill needs the keyboard."""
     if sys.platform == 'darwin':
         from PyObjCTools import AppHelper
         def apply():
@@ -308,7 +310,9 @@ class DesktopApi:
             target = capture.target
             def attempted():
                 capture.paste_attempted = True
-            result = capture.paster.paste(target, body.get('english'), attempted)
+            # Granola pastes through the clipboard too; ours must wait until it has put the old one back.
+            settle = {'settle': True} if body.get('source') == 'granola' else {}
+            result = capture.paster.paste(target, body.get('english'), attempted, **settle)
             try:
                 save_history(capture.capture_id, body['english'], target.name)
             except sqlite3.Error:
@@ -388,7 +392,7 @@ class DesktopApi:
             raise ValueError('Invalid request.')
         window = self._capture.window
         if window:
-            # Flow needs normal keyboard/IME input; the focused page handles Enter/Esc itself.
+            # Flow and Granola need normal keyboard/IME input; the focused page handles Enter/Esc itself.
             if self._capture.capture_keys:
                 self._capture.capture_keys.stop()
             take_keyboard(window)
@@ -432,7 +436,7 @@ class DesktopApi:
         os.startfile(folder)
 
     def pick_file(self, token):
-        """Browse… for Codex, Claude Code or Wispr Flow: one .exe."""
+        """Browse… for Codex, Claude Code, Wispr Flow or Granola: one .exe."""
         if token != server.CSRF:
             raise ValueError('Invalid file request.')
         types = ('All files (*.*)',) if sys.platform == 'darwin' else ('Programs (*.exe)',)

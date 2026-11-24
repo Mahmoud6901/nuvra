@@ -107,11 +107,37 @@ class Routes(unittest.TestCase):
                 patch.object(server.meetings, 'stop', return_value={}), \
                 patch.object(server.direct_sessions, 'catalog', return_value={'projects': [], 'apps': []}), \
                 patch.object(server.translate, 'codex_text', side_effect=ValueError('no network in tests')), \
-                patch.object(server.speech, 'open_wispr_flow', return_value={'installed': False}):
+                patch.object(server.speech, 'open_wispr_flow', return_value={'installed': False}), \
+                patch.object(server.speech, 'open_granola', return_value={'installed': False}):
             for route in routes:
                 if self.status('GET', route) == 404 and self.status('POST', route) == 404:
                     unhandled.append(route)
         self.assertEqual(unhandled, [])
+
+    def test_gemini_key_is_private_and_independent_of_cohere(self):
+        def get_status():
+            connection = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)
+            try:
+                connection.request('GET', '/api/status', headers={'Origin': server.ORIGIN})
+                return json.loads(connection.getresponse().read())
+            finally:
+                connection.close()
+
+        route = '/api/gemini/key'
+        key = 'synthetic-gemini-route-key'
+        self.assertEqual(self.status('POST', route, {'key': key}, token='wrong'), 403)
+        self.assertFalse(get_status()['geminiConfigured'])
+        self.assertEqual(self.status('POST', '/api/cohere/key', {'key': 'synthetic-cohere-key'}), 200)
+        self.assertEqual(self.status('POST', route, {'key': key}), 200)
+        status = get_status()
+        self.assertTrue(status['geminiConfigured'])
+        self.assertTrue(status['cohereConfigured'])
+        self.assertNotIn(key, json.dumps(status))
+        self.assertNotIn(key.encode(), (paths.DATA / 'gemini.bin').read_bytes())
+        self.assertEqual(self.status('POST', route, {'key': ''}), 200)
+        status = get_status()
+        self.assertFalse(status['geminiConfigured'])
+        self.assertTrue(status['cohereConfigured'])
 
     def test_status_reports_prompt_choice(self):
         connection = http.client.HTTPConnection('127.0.0.1', self.port, timeout=10)

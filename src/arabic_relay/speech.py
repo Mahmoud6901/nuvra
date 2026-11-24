@@ -1,4 +1,4 @@
-"""The three speech choices: local Whisper (via speech_worker.py), Cohere, and Wispr Flow."""
+"""The speech choices: local Whisper (via speech_worker.py), Gemini live, Cohere, Wispr Flow and Granola."""
 import io
 import json
 import logging
@@ -16,7 +16,7 @@ import webbrowser
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from . import aliases, engine_host, incremental, local_translator, locate, models, paths, speech_learning, store
+from . import aliases, engine_host, gemini_live, incremental, local_translator, locate, models, paths, speech_learning, store
 
 
 TRANSCRIBE_LOCK = threading.Lock()
@@ -28,7 +28,7 @@ def worker_environment():
     env = os.environ.copy()
     env['HF_HUB_OFFLINE'] = '1'
     env['HF_HUB_DISABLE_TELEMETRY'] = '1'
-    for key in ('OPENAI_API_KEY', 'CODEX_API_KEY', 'ANTHROPIC_API_KEY'):
+    for key in ('OPENAI_API_KEY', 'CODEX_API_KEY', 'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'):
         env.pop(key, None)
     return env
 
@@ -270,28 +270,63 @@ def open_wispr_flow():
     return {'installed': executable is not None}
 
 
-def load_cohere_key():
+def open_granola():
+    """Opens the installed app, or its official download page. Dictation itself belongs to Granola's own shortcut."""
+    executable = locate.tool_path('granola')
+    with locate.external_runtime():
+        if executable:
+            subprocess.Popen([str(executable)], creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        elif not webbrowser.open('https://www.granola.ai/download'):
+            raise ValueError('افتح granola.ai/download في المتصفح وثبّت Granola.')
+    return {'installed': executable is not None}
+
+
+def granola_status():
+    """Granola dictates only while it is open. None: the system could not say whether it is."""
+    executable = locate.tool_path('granola')
+    return {'granolaInstalled': executable is not None,
+            'granolaRunning': locate.process_running(executable.name if executable else 'Granola.exe')}
+
+
+def load_key(service, again):
+    """The user's saved API key for one online service, encrypted with store.protect; '' when none is saved."""
     with store.AUTH_LOCK:
-        path = paths.DATA / 'cohere.bin'
+        path = paths.DATA / f'{service}.bin'
         try:
             return store.protect(path.read_bytes(), True).decode() if path.exists() else ''
         except Exception:
-            raise ValueError('اكتب مفتاح Cohere تاني من تبويب النماذج.') from None
+            raise ValueError(again) from None
 
 
-def save_cohere_key(key):
+def save_key(service, key, invalid):
     if not isinstance(key, str) or len(key) > 4096 or any(ord(c) < 33 or ord(c) > 126 for c in key.strip()):
-        raise ValueError('اكتب مفتاح Cohere من غير مسافات أو سطور جديدة.')
+        raise ValueError(invalid)
     key = key.strip()
     with store.AUTH_LOCK:
-        path = paths.DATA / 'cohere.bin'
+        path = paths.DATA / f'{service}.bin'
         if key:
-            temporary = paths.DATA / 'cohere.tmp'
+            temporary = paths.DATA / f'{service}.tmp'
             temporary.write_bytes(store.protect(key.encode()))
             temporary.replace(path)
         else:
             path.unlink(missing_ok=True)
     return {'configured': bool(key)}
+
+
+def load_cohere_key():
+    return load_key('cohere', 'اكتب مفتاح Cohere تاني من تبويب النماذج.')
+
+
+def save_cohere_key(key):
+    return save_key('cohere', key, 'اكتب مفتاح Cohere من غير مسافات أو سطور جديدة.')
+
+
+def load_gemini_key():
+    return load_key('gemini', 'اكتب مفتاح Gemini تاني من تبويب النماذج.')
+
+
+def save_gemini_key(key):
+    return save_key('gemini', key, 'اكتب مفتاح Gemini من غير مسافات أو سطور جديدة.')
 
 
 def transcript_result(text, model):
@@ -310,8 +345,8 @@ class NoCohereRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def cohere_clips(audio):
-    """Split recordings over two minutes at quiet pauses; preserve every PCM sample in order."""
+def wav_pcm(audio):
+    """The samples of a 16 kHz mono 16-bit WAV of at most five minutes."""
     try:
         with wave.open(io.BytesIO(audio), 'rb') as clip:
             frames = clip.getnframes()
@@ -321,6 +356,13 @@ def cohere_clips(audio):
                 raise ValueError()
     except (ValueError, EOFError, wave.Error):
         raise ValueError('التسجيل لازم يكون WAV سليم وأقل من خمس دقايق.') from None
+    return pcm
+
+
+def cohere_clips(audio):
+    """Split recordings over two minutes at quiet pauses; preserve every PCM sample in order."""
+    pcm = wav_pcm(audio)
+    frames = len(pcm) // 2
     if frames <= 120 * 16000:
         return [audio]
     import numpy as np
@@ -381,6 +423,44 @@ def transcribe_cohere(audio, kind):
         TRANSCRIBE_LOCK.release()
 
 
+def gemini_job(job_id, inline_mode, keywords):
+    key = load_gemini_key()
+    if not key:
+        raise ValueError('ضيف مفتاح Gemini من تبويب النماذج الأول.')
+    return gemini_live.Job(job_id, key, keywords, inline_mode, approved_rules())
+
+
+def gemini_response(job, text):
+    response = apply_aliases(transcript_result(text, gemini_live.MODEL), job.rules)
+    stopped, first = job.times['stop'], job.times.get('firstPartial')
+    response['timings'] = {'path': 'gemini-live', 'stopToFinalMs': round((time.monotonic() - stopped) * 1000),
+                           'firstPartialMs': round((first - job.times['start']) * 1000) if first else None}
+    logging.info('Speech timing: stop to transcript %d ms (Gemini live, %d connections)',
+                 response['timings']['stopToFinalMs'], job.connections)
+    return speech_learning.offer(response)      # without a local model, so never kept for training
+
+
+def transcribe_gemini(audio, kind, keywords=(), cancel_event=None):
+    """A finished recording: a retry the user asks for, or a window that could not send audio live."""
+    if kind != 'audio/wav':
+        raise ValueError('Gemini محتاج صوت WAV. سجّل تاني.')
+    pcm = wav_pcm(audio)
+    if not TRANSCRIBE_LOCK.acquire(blocking=False):
+        raise ValueError('فيه تسجيل بيتحوّل دلوقتي. استنى لما يخلص.')
+    job = None
+    try:
+        job = gemini_job(secrets.token_urlsafe(24), False, keywords)
+        step = gemini_live.MAX_CHUNK * 2
+        for seq, start in enumerate(range(0, len(pcm), step)):
+            job.append(seq, pcm[start:start + step])
+        # Five minutes of audio take about half a minute to send; the final text follows it.
+        return gemini_response(job, job.finish(len(pcm) // 2, job.next_seq - 1, timeout=150, cancel_event=cancel_event))
+    finally:
+        if job is not None:
+            job.cancel()
+        TRANSCRIBE_LOCK.release()
+
+
 def cohere_request(audio, key):
     """One request, never retried. An empty section is allowed; the combined transcript must contain speech."""
     boundary = 'relay-' + secrets.token_hex(24)
@@ -427,8 +507,8 @@ def parse_keywords(vocabulary):
 def transcribe(audio, content_type, vocabulary='', provider='whisper', inline_mode=False, retry=False, retry_seconds=30, cancel_event=None):
     if retry and (not inline_mode or not 0 < retry_seconds <= 30):
         raise ValueError('خلصت محاولات التعرف على الكلام.')
-    if provider not in ('whisper', 'cohere'):
-        raise ValueError('اختار Whisper أو Cohere للتسجيل بالمايك.')
+    if provider not in ('whisper', 'cohere', 'gemini'):
+        raise ValueError('اختار Whisper أو Gemini أو Cohere للتسجيل بالمايك.')
     formats = {'audio/webm': ('webm', lambda b: b.startswith(b'\x1aE\xdf\xa3')),
                'audio/wav': ('wav', lambda b: b.startswith(b'RIFF') and b[8:12] == b'WAVE'),
                'audio/mp4': ('mp4', lambda b: b[4:8] == b'ftyp')}
@@ -438,6 +518,8 @@ def transcribe(audio, content_type, vocabulary='', provider='whisper', inline_mo
     keywords = parse_keywords(vocabulary)
     if provider == 'cohere':
         return speech_learning.offer(transcribe_cohere(audio, kind))
+    if provider == 'gemini':
+        return transcribe_gemini(audio, kind, keywords, cancel_event)
     folder = speech_model_path()
     if folder is None:
         raise ValueError('اختار نموذج Whisper من تبويب النماذج.')
@@ -611,7 +693,8 @@ def release_stream(job):
 
 
 def _stream_released(job):
-    engine_host.HOST.release_hold()
+    if not getattr(job, 'online', False):        # a Gemini recording never holds the local model
+        engine_host.HOST.release_hold()
     TRANSCRIBE_LOCK.release()
 
 
@@ -622,11 +705,30 @@ def expire_streams():
 incremental.REGISTRY.on_release = _stream_released
 
 
-def stream_start(job_id, inline_mode=False, vocabulary=''):
+def gemini_start(job_id, inline_mode, keywords):
+    """Stream one recording to Gemini while it is spoken. Failures are errors: no other provider takes over."""
+    busy = 'فيه تسجيل بيتحوّل دلوقتي. استنى لما يخلص.'
+    if not TRANSCRIBE_LOCK.acquire(blocking=False):
+        raise ValueError(busy)
+    try:
+        job = incremental.REGISTRY.start(job_id, lambda: gemini_job(job_id, inline_mode, keywords))
+        if job is None:
+            raise ValueError(busy)
+    except BaseException:
+        TRANSCRIBE_LOCK.release()
+        raise
+    if inline_mode:
+        local_translator.warm()
+    return {'accepted': True}
+
+
+def stream_start(job_id, inline_mode=False, vocabulary='', provider='whisper'):
     """Begin processing during speech for one recording; {'accepted': False} keeps the full-clip path."""
-    if type(inline_mode) is not bool:
+    if type(inline_mode) is not bool or provider not in ('whisper', 'gemini'):
         raise ValueError('طلب التسجيل مش صحيح.')
     expire_streams()
+    if provider == 'gemini':
+        return gemini_start(job_id, inline_mode, parse_keywords(vocabulary))
     if not incremental_enabled():
         return {'accepted': False, 'reason': 'disabled'}
     folder = speech_model_path()
@@ -674,6 +776,8 @@ def stream_finish(job_id, last_seq, total_samples):
     job = incremental.REGISTRY.get(job_id)
     stopped = time.monotonic()
     try:
+        if getattr(job, 'online', False):
+            return gemini_response(job, job.finish(total_samples, last_seq))
         # The Egyptian Turbo model can recover a conditional lost in the live passes by hearing the whole
         # utterance in one Whisper window (30 s). Keep the shorter stop-time budget for the other models.
         whole_seconds = 30 if models.is_egyptian_turbo(job.key[0]) else 12

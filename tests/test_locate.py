@@ -186,6 +186,20 @@ class Tools(unittest.TestCase):
             self.assertEqual(locate.tool_path('wispr'), app)
         registry.assert_called_with('Wispr Flow')
 
+    def test_granola_is_discovered_and_browse_overrides_the_default(self):
+        installed = make_exe(self.local / 'Programs/Granola/Granola.exe')
+        self.assertEqual(locate.tool_path('granola'), installed)
+        custom = make_exe(self.root / 'Other install/Granola.exe')
+        locate.set_tool_path('granola', str(custom))
+        self.assertEqual(locate.tool_path('granola'), custom)
+
+    def test_granola_registry_install_can_use_a_versioned_display_name_and_icon(self):
+        folder = self.root / 'Some folder/Granola'
+        fake = FakeRegistry({'A': {'DisplayName': 'Granola 2.1.0', 'DisplayIcon': f'"{folder / "Granola.exe"}",0'},
+                             'B': {'DisplayName': 'GranolaHelper', 'InstallLocation': str(self.root)}})
+        with patch.object(locate, 'winreg', fake):
+            self.assertEqual(REAL_REGISTRY('Granola', versioned=True), [folder])
+
     def test_registry_reader_filters_by_display_name(self):
         fake = FakeRegistry({'A': {'DisplayName': 'Wispr Flow', 'InstallLocation': 'C:\\Apps\\Wispr'},
                              'B': {'DisplayName': 'Other', 'InstallLocation': 'C:\\Apps\\Other'},

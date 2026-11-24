@@ -11,7 +11,7 @@ Nuvra is an open-source dictation app for Windows, with experimental macOS build
 ### Windows
 
 1. Download the Windows installer from the [website](https://mahmoud6901.github.io/nuvra/#download) and run it. New builds are named `Nuvra-Setup-<version>.exe`. Installation is per user.
-2. Open Nuvra and choose a speech model in **Models**. Local Whisper models download from this tab. Cohere and Wispr Flow are also available.
+2. Open Nuvra and choose a speech model in **Models**. Local Whisper models download from this tab. Gemini 3.5 Transcribe Live, Granola Voice Typing, Cohere and Wispr Flow are also available; see [Gemini and Granola](#gemini-and-granola).
 3. Install and sign in to Codex CLI or Claude Code, then select your preferred model in **Models** for English prompt preparation and translation fallback.
 4. Choose **Translate Arabic only** or **Structured prompt** in **Settings**.
 5. Keep Nuvra running, click in the destination text field, and press **Ctrl + Alt + Space**. Speak, then press the shortcut again to finish and paste.
@@ -64,6 +64,14 @@ With **Wispr Flow** selected, Nuvra's shortcut opens the capture pill. Use Flow'
 
 If pasting fails, check the recording pill's status and **History** to recover the text. Nuvra also attempts to copy it to the clipboard.
 
+### Gemini and Granola
+
+In **Models → Speech to text**, choose **Use** beside the provider you want. Your choice applies to both **Inline** and **English Prompt**.
+
+**Gemini 3.5 Transcribe Live.** Paste your Google AI Studio API key under the Gemini row and choose **Save key**. Nuvra encrypts the key on your computer. As you dictate, Nuvra streams audio to Google and shows a live transcript in the pill. After you stop, Nuvra uses the final transcript for your selected writing mode. If the connection drops, Nuvra can reconnect and replay the recording to Gemini. If that fails, choose **Retry** to try the recording again. Your API key’s quota and pricing apply. [Get an API key](https://aistudio.google.com/apikey) · [Gemini API pricing](https://ai.google.dev/gemini-api/docs/pricing)
+
+**Granola Voice Typing (Windows).** Install Granola, sign in, and keep it open. In Granola, turn on **Settings → Voice typing** and choose **Auto-detect** for mixed Arabic and English. Open the Nuvra pill with your usual shortcut. Hold Granola’s shortcut (**Left Ctrl + Windows** by default) as you speak, then release it. Granola inserts the finished text into the pill, and Nuvra prepares and pastes it. For a custom install location, choose **Locate…** in **Models**. [Download Granola](https://www.granola.ai/download) · [Voice Typing setup](https://docs.granola.ai/help-center/voice-typing/intro)
+
 ## The app window
 
 - **History** holds your latest 10 text entries, with controls to copy, delete, or clear them.
@@ -85,7 +93,8 @@ Each meeting has a dated folder under `.local/asr-learning/meetings/` in the pro
 | Feature | Processing and storage |
 | --- | --- |
 | Local Whisper | Transcribes audio on your computer. If you enable recording capture, eligible clips and source transcripts are saved in your local training inbox. |
-| Cohere or Wispr Flow | Uses the selected provider's online speech service. |
+| Gemini 3.5 Transcribe Live | Only when selected with your own key. Sends the recording to Google while you speak. |
+| Cohere, Wispr Flow or Granola | Uses the selected provider's online speech service. |
 | Local Arabic translation | Runs through Ollama when enabled and available. |
 | Structured prompts and translation fallback | Sends text through your selected Codex or Claude Code provider using your signed-in account. |
 | History | Stores recent text and destination information locally. |

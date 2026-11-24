@@ -12,6 +12,8 @@ LOCK = threading.Lock()
 MAX_CLIPBOARD = 32 * 1024 * 1024
 CLIPBOARD_QUIET = .12       # seconds nobody may hold the clipboard before the paste keys go out
 CLIPBOARD_BUSY_LIMIT = .6
+CLIPBOARD_IDLE = .4         # another dictation app just pasted: wait until it has put the old clipboard back
+CLIPBOARD_IDLE_LIMIT = 1.2
 
 
 class POINT(ctypes.Structure):
@@ -284,7 +286,15 @@ class Paster:
     def capture(self):
         return self.windows().capture()
 
-    def paste(self, target, text, attempted):
+    def wait_clipboard_idle(self, win):
+        start = changed = time.monotonic()
+        sequence = win.sequence()
+        while time.monotonic() - start < CLIPBOARD_IDLE_LIMIT and time.monotonic() - changed < CLIPBOARD_IDLE:
+            time.sleep(.02)
+            if win.sequence() != sequence:
+                sequence, changed = win.sequence(), time.monotonic()
+
+    def paste(self, target, text, attempted, settle=False):
         if not isinstance(text, str) or not text.strip() or len(text) > 16000 or '\0' in text:
             raise ValueError('Prepare a prompt between 1 and 16,000 characters before pasting.')
         if target is None:
@@ -295,6 +305,8 @@ class Paster:
         try:
             win = self.windows()
             win.wait_modifiers()
+            if settle:
+                self.wait_clipboard_idle(win)
             win.restore_target(target)
             win.open_clipboard()
             try:

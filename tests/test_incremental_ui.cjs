@@ -10,6 +10,8 @@ function element(){return {value:'',disabled:false,hidden:false,textContent:'',i
 for(const match of html.matchAll(/id="([^"]+)"/g))nodes.set(match[1],element());
 const requests=[],storage=new Map([['relay-language','ar']]),contexts=[],workletNodes=[],pastes=[],stages=[];
 const inlineQuick=quickMode&&process.argv.includes('--inline');
+const geminiQuick=quickMode&&process.argv.includes('--gemini');
+if(geminiQuick)storage.set('relay-dictation-provider','gemini');
 if(inlineQuick)storage.set('relay-writing-mode','inline');
 let micStarts=0,stops=0,incremental=true,chunkFailure=false,finishFailure=false,finishGate=null;
 class Recorder{
@@ -37,13 +39,13 @@ const context=vm.createContext({console,crypto:require('node:crypto'),Blob,Map,S
  navigator:{mediaDevices:{async getUserMedia(){micStarts++;return {getTracks:()=>[{stop(){stops++;}}]};}}},
  URL:{createObjectURL(){return 'blob:mock';},revokeObjectURL(){}},
  fetch:async(url,options)=>{requests.push({url,options});let data,ok=true;
-  if(url==='/api/status')data={csrf:'test-token',speechConfigured:true,speechModel:'Whisper large-v3',speechDevice:'GPU',setupNeeded:false,promptChoice:{tool:'codex',model:'',effort:'low'},promptLabel:'Codex · Default · low',selfLearning:true,autoSpelling:false,incrementalDictation:incremental,nativeDesktop:true};
+  if(url==='/api/status')data={csrf:'test-token',speechConfigured:!geminiQuick,geminiConfigured:geminiQuick,speechModel:'Whisper large-v3',speechDevice:'GPU',setupNeeded:false,promptChoice:{tool:'codex',model:'',effort:'low'},promptLabel:'Codex · Default · low',selfLearning:true,autoSpelling:false,incrementalDictation:geminiQuick?false:incremental,nativeDesktop:true};
   else if(url==='/api/incremental'){incremental=JSON.parse(options.body).enabled;data={incrementalDictation:incremental};}
   else if(url==='/api/speech/prepare'||url==='/api/speech/cancel-prepare')data={prepared:true};
   else if(url==='/api/vocabulary')data={words:[],corrections:[]};
   else if(url==='/api/stream/start')data={accepted:true};
   else if(url==='/api/stream/chunk'){if(chunkFailure){ok=false;data={error:'Recording audio arrived out of order.'};}else data={seq:Number(options.headers['X-Relay-Stream-Seq']),provisional:'عايز أعمل redesign'};}
-  else if(url==='/api/stream/finish'){if(finishGate)await finishGate;if(finishFailure){ok=false;data={error:'This recording is no longer active.'};}else data={text:'عايز أعمل redesign للصفحة',rawText:'عايز أعمل redesign للصفحة',incremental:{used:true,passes:12,finalDecode:'none',tailSeconds:0},timings:{path:'incremental',stopToFinalMs:420}};}
+  else if(url==='/api/stream/finish'){if(finishGate)await finishGate;if(finishFailure){ok=false;data={error:'This recording is no longer active.'};}else data={text:'عايز أعمل redesign للصفحة',rawText:'عايز أعمل redesign للصفحة',timings:{path:geminiQuick?'gemini-live':'incremental',stopToFinalMs:420}};}
   else if(url==='/api/stream/cancel')data={cancelled:true};
   else if(url==='/api/transcribe')data={text:'نص التسجيل كامل',rawText:'نص التسجيل كامل'};
   else if(url==='/api/translate')data={english:'Redesign the home page.',vocabulary:{words:[],corrections:[]}};
@@ -66,7 +68,13 @@ async function stop(){await nodes.get('stopRecording').click();await flush(8);}
   // Shortcut capture: provisional text never reaches the paste path; the final prompt pastes exactly once.
   await record();
   workletNodes.at(-1).emit(new Int16Array(16000));await flush();
-  assert.ok(nodes.get('provisionalText').textContent.includes('redesign'));
+  const preview=nodes.get(geminiQuick?'captureLive':'provisionalText');
+  assert.ok(preview.textContent.includes('redesign'));
+  if(geminiQuick){
+   assert.equal(preview.hidden,false);
+   assert.equal(JSON.parse(requests.find(r=>r.url==='/api/stream/start').options.body).provider,'gemini');
+   assert.equal(count('/api/speech/prepare'),0);
+  }
   assert.equal(pastes.length,0);
   finishGate=new Promise(resolve=>{context.releaseFinish=resolve;});
   const stopping=stop();await flush();
@@ -80,6 +88,12 @@ async function stop(){await nodes.get('stopRecording').click();await flush(8);}
   // A shortcut recording runs every stage automatically, so its timing names each stage and the total after Stop.
   assert.match(nodes.get('stageStatus').textContent,
    /^Paste requested · transcript \d+\.\d s · prompt \d+\.\d s · paste request \d+\.\d s · total after Stop \d+\.\d s$/,nodes.get('stageStatus').textContent);
+  if(geminiQuick){
+   finishFailure=true;
+   await record();workletNodes.at(-1).emit(new Int16Array(16000));await flush();await stop();
+   assert.equal(count('/api/transcribe'),0,'A failed live session must not upload the recording again automatically');
+   assert.equal(pastes.length,1,'A partial or failed recording must not paste');
+  }
   console.log('Quick capture: provisional transcript stays display-only; the final prompt pastes once, never Enter.');
   return;
  }

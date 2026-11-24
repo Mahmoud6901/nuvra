@@ -3,6 +3,7 @@ from contextlib import contextmanager
 import ctypes
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 if os.name == 'nt':
@@ -15,7 +16,7 @@ from . import paths, store
 HF_REPOS = ('models--Systran--faster-whisper-large-v3', 'models--mobiuslabsgmbh--faster-whisper-large-v3-turbo',
             'models--Abdallah151--faster-whisper-egyptian-code-switching-large-v3-turbo')
 APP_MODELS = ('large-v3', 'large-v3-turbo', 'large-v3-turbo-egyptian')  # downloaded into paths.DATA/models
-TOOLS = ('codex', 'claude', 'wispr')
+TOOLS = ('codex', 'claude', 'wispr', 'granola')
 UNINSTALL = r'Software\Microsoft\Windows\CurrentVersion\Uninstall'
 FORMAT_HELP = 'Nuvra محتاج نسخة faster-whisper (Systran/faster-whisper-large-v3).'
 
@@ -97,12 +98,57 @@ def wispr_flow_path():
     return None
 
 
+def granola_path():
+    """Granola installs for one user, under Local/Programs. Its voice typing is for Windows here; Macs have no check."""
+    if sys.platform == 'darwin':
+        return None
+    programs = Path(os.environ.get('LOCALAPPDATA', '')) / 'Programs'
+    roots = [programs / 'Granola', *(p.parent for p in programs.glob('*/Granola.exe'))]
+    roots += [Path(os.environ['ProgramFiles']) / 'Granola'] if os.environ.get('ProgramFiles') else []
+    roots += registry_install_folders('Granola', versioned=True)
+    return next((root / 'Granola.exe' for root in roots if (root / 'Granola.exe').is_file()), None)
+
+
+def process_running(name):
+    """Whether a program with this file name is running; None when the system cannot say."""
+    if os.name != 'nt':
+        return None
+    from ctypes import wintypes as w
+
+    class Entry(ctypes.Structure):
+        _fields_ = [('size', w.DWORD), ('usage', w.DWORD), ('pid', w.DWORD), ('heap', ctypes.c_size_t), ('module', w.DWORD),
+                    ('threads', w.DWORD), ('parent', w.DWORD), ('priority', w.LONG), ('flags', w.DWORD),
+                    ('name', w.WCHAR * 260)]
+    kernel = ctypes.WinDLL('kernel32')
+    for function, result, arguments in (('CreateToolhelp32Snapshot', w.HANDLE, [w.DWORD, w.DWORD]),
+                                        ('Process32FirstW', w.BOOL, [w.HANDLE, ctypes.POINTER(Entry)]),
+                                        ('Process32NextW', w.BOOL, [w.HANDLE, ctypes.POINTER(Entry)]),
+                                        ('CloseHandle', w.BOOL, [w.HANDLE])):
+        getattr(kernel, function).restype, getattr(kernel, function).argtypes = result, arguments
+    snapshot = kernel.CreateToolhelp32Snapshot(2, 0)      # TH32CS_SNAPPROCESS
+    if not snapshot or snapshot == ctypes.c_void_p(-1).value:
+        return None
+    try:
+        entry = Entry(size=ctypes.sizeof(Entry))
+        found = kernel.Process32FirstW(snapshot, ctypes.byref(entry))
+        if not found:
+            return None
+        while found:
+            if entry.name.casefold() == name.casefold():
+                return True
+            found = kernel.Process32NextW(snapshot, ctypes.byref(entry))
+        return False
+    finally:
+        kernel.CloseHandle(snapshot)
+
+
 def winget_links():
     return Path(os.environ.get('LOCALAPPDATA', '')) / 'Microsoft/WinGet/Links'
 
 
-def registry_install_folders(name):
-    """InstallLocation of every installed program whose DisplayName is `name` (Windows "Installed apps")."""
+def registry_install_folders(name, versioned=False):
+    """InstallLocation of every installed program whose DisplayName is `name` (Windows "Installed apps"). With
+    `versioned`, the name may end in a version and the folder may come from the program's icon instead."""
     folders = []
     if winreg is None:
         return folders
@@ -121,16 +167,24 @@ def registry_install_folders(name):
             index += 1
             try:
                 key = winreg.OpenKey(root, entry)
-                if winreg.QueryValueEx(key, 'DisplayName')[0] == name:
-                    location = winreg.QueryValueEx(key, 'InstallLocation')[0]
+                shown = winreg.QueryValueEx(key, 'DisplayName')[0]
+                if shown == name or versioned and re.fullmatch(re.escape(name) + r' \d[\w.-]*', str(shown)):
+                    try:
+                        location = winreg.QueryValueEx(key, 'InstallLocation')[0]
+                    except OSError:
+                        location = ''
                     if isinstance(location, str) and location.strip():
                         folders.append(Path(location.strip()))
+                    elif versioned:
+                        icon = str(winreg.QueryValueEx(key, 'DisplayIcon')[0]).rsplit(',', 1)[0].strip('" ')
+                        if icon:
+                            folders.append(Path(icon).parent)
             except OSError:
                 continue
     return folders
 
 
-AUTO_DETECT = {'codex': 'translator_path', 'claude': 'claude_path', 'wispr': 'wispr_flow_path'}
+AUTO_DETECT = {'codex': 'translator_path', 'claude': 'claude_path', 'wispr': 'wispr_flow_path', 'granola': 'granola_path'}
 
 
 def unix_tool(name):
@@ -150,7 +204,7 @@ def valid_tool(program, kind):
 
 def check_kind(kind):
     if kind not in TOOLS:
-        raise ValueError('اختار Codex أو Claude Code أو Wispr Flow.')
+        raise ValueError('اختار Codex أو Claude Code أو Wispr Flow أو Granola.')
 
 
 def tool_path(kind):

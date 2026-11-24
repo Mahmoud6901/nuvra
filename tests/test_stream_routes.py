@@ -7,7 +7,9 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from arabic_relay import paths, server, speech, store
+from arabic_relay import gemini_live, paths, server, speech, store
+from tests.test_cohere import wav
+from tests.test_gemini_live import Socket
 from tests.test_incremental import RATE, SCRIPT, FakeRecognizer, scripted_audio
 
 
@@ -63,6 +65,45 @@ class StreamRoutes(unittest.TestCase):
 
     def short_recording(self):
         self.audio = self.recognizer.audio = scripted_audio(9)
+
+    def test_gemini_selection_routes_audio_without_a_local_model_or_learning_pair(self):
+        job = 'gemini-route-' + 'x' * 24
+        audio = b'\x01\x00' * 4000
+        heard = 'إيه علاقة JEV بالموضوع؟'
+        store.set_setting('incremental_dictation', 0)
+        start = {'jobId': job, 'provider': 'gemini', 'inline': True}
+        with patch.object(speech, 'load_gemini_key', return_value=''), \
+                patch.object(gemini_live, 'open_socket') as unopened:
+            self.assertEqual(self.post('/api/stream/start', start)[0], 400)
+            unopened.assert_not_called()
+        with patch.object(gemini_live, 'open_socket', return_value=Socket(heard)), \
+                patch.object(speech, 'load_gemini_key', return_value='synthetic-key'), \
+                patch.object(speech, 'speech_model_path', side_effect=AssertionError('Unexpected Whisper lookup')):
+            status, response = self.post('/api/stream/start', start)
+            self.assertEqual(status, 200, response)
+            self.assertTrue(response['accepted'])
+            self.assertEqual(self.chunk(job, 0, audio)[0], 200)
+            status, response = self.post('/api/stream/finish', {'jobId': job, 'lastSeq': 0, 'totalSamples': 4000})
+            self.assertEqual(status, 200, response)
+            self.assertEqual(response['text'], heard)
+            self.assertEqual(response['rawText'], heard)
+            self.assertEqual(response['timings']['path'], 'gemini-live')
+            self.assertFalse(response.get('learning'))
+            self.assertFalse(speech.TRANSCRIBE_LOCK.locked())
+
+    def test_explicit_gemini_retry_uses_the_same_provider_for_the_saved_wav(self):
+        headers = {'Content-Type': 'audio/wav', 'X-Relay-Provider': 'gemini'}
+        heard = 'خلّي اسم المشروع JEV'
+        with patch.object(gemini_live, 'open_socket', return_value=Socket(heard)) as connect, \
+                patch.object(speech, 'load_gemini_key', return_value='synthetic-key'), \
+                patch.object(speech, 'speech_model_path', side_effect=AssertionError('Unexpected Whisper lookup')):
+            status, response = self.post('/api/transcribe', wav(), headers)
+            self.assertEqual(status, 200, response)
+            self.assertEqual(response['rawText'], heard)
+            self.assertFalse(response.get('learning'))
+            status, _ = self.post('/api/transcribe', b'\x1a\x45\xdf\xa3', {**headers, 'Content-Type': 'audio/webm'})
+            self.assertEqual(status, 400)
+            connect.assert_called_once()
 
     def test_short_whole_and_streamed_dictations_reach_correct_last_with_only_the_recording_source(self):
         inbox = paths.DATA / 'training'

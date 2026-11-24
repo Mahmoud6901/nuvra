@@ -65,6 +65,15 @@ class ClipboardDelivery(unittest.TestCase):
         self.paster.restore_and_release(*args)
         self.assertEqual(self.win.rows, [(13, b'original')])
 
+    def test_granola_may_restore_the_clipboard_before_nuvra_pastes(self):
+        self.win.write([(13, b'granola transcript')])
+        with patch.object(self.paster, 'wait_clipboard_idle', side_effect=lambda win: win.write([(13, b'original')])) as wait:
+            result = self.paster.paste(self.target, 'Prepared text', Mock(), settle=True)
+        wait.assert_called_once_with(self.win)
+        self.assertEqual(result['status'], 'paste_requested')
+        self.paster.restore_and_release(*self.timer.call_args.kwargs['args'])
+        self.assertEqual(self.win.rows, [(13, b'original')])
+
     def test_paste_keys_wait_for_the_clipboard_to_be_free(self):
         order = []
         self.win.settle_clipboard.side_effect = lambda: order.append('settled')
@@ -245,6 +254,13 @@ class NativeBridge(unittest.TestCase):
             attempted()
             return {'status': 'paste_requested', 'app': 'Notepad', 'message': 'Paste requested'}
         self.capture.paster.paste.side_effect = deliver
+
+    def test_granola_handoff_requests_the_clipboard_wait(self):
+        self.capture.paster.paste.side_effect = None
+        self.capture.paster.paste.return_value = {'status': 'paste_requested'}
+        self.api.paste_to_target({'source': 'granola', 'english': 'Exact prompt',
+                                  'captureId': self.armed['captureId']}, self.token)
+        self.assertEqual(self.capture.paster.paste.call_args.kwargs, {'settle': True})
 
     def test_bridge_requires_native_capture_and_csrf_and_rejects_duplicates(self):
         body = {'english': 'Exact prompt', 'captureId': self.armed['captureId']}
