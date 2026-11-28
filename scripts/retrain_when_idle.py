@@ -146,6 +146,8 @@ def verify_pending(inbox, model_folder):
     folder = inbox / '.pending'
     if folder.resolve().parent != inbox.resolve() or folder.is_symlink():
         raise train_speech.InputError('pending recordings must be stored directly in the inbox')
+    # The app stores the resolved verifier path, including the long spelling of Windows 8.3 names.
+    bound_model_path = model_folder.resolve()
     model = None
     matched = skipped = 0
     for label in sorted(folder.glob('*.txt')):
@@ -162,7 +164,7 @@ def verify_pending(inbox, model_folder):
             if eligible and label.stem.startswith('nuvra-'):
                 try:
                     eligible = (binding.is_file() and not binding.is_symlink() and binding.stat().st_size <= 8192
-                                and Path(binding.read_text(encoding='utf-8').strip()) == model_folder)
+                                and Path(binding.read_text(encoding='utf-8').strip()) == bound_model_path)
                 except (UnicodeError, FileNotFoundError):
                     eligible = False
             if eligible:

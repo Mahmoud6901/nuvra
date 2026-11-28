@@ -87,7 +87,7 @@ class IdleInbox(unittest.TestCase):
         self.blocked.return_value = None
         self.assertEqual(self.check(), 0)
         self.train.assert_called_once()
-        self.assertEqual(self.report()['latestModel'], str(self.root / 'models' / 'trained'))
+        self.assertEqual(Path(self.report()['latestModel']), (self.root / 'models' / 'trained').resolve())
         manifest = self.args.inbox / '.nuvra-manifest.json'
         first, = json.loads(manifest.read_text(encoding='utf8'))['clips']
         self.assertEqual((first['split'], first['reference']), ('train', 'افتح الملف'))
