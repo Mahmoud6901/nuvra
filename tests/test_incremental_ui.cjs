@@ -68,10 +68,11 @@ async function stop(){await nodes.get('stopRecording').click();await flush(8);}
   // Shortcut capture: provisional text never reaches the paste path; the final prompt pastes exactly once.
   await record();
   workletNodes.at(-1).emit(new Int16Array(16000));await flush();
-  const preview=nodes.get(geminiQuick?'captureLive':'provisionalText');
+  const preview=nodes.get('captureLive');
   assert.ok(preview.textContent.includes('redesign'));
+  assert.equal(preview.hidden,false);
+  assert.ok(stages.includes('live'),'The native shortcut pill expands to show the transcript');
   if(geminiQuick){
-   assert.equal(preview.hidden,false);
    assert.equal(JSON.parse(requests.find(r=>r.url==='/api/stream/start').options.body).provider,'gemini');
    assert.equal(count('/api/speech/prepare'),0);
   }
@@ -81,6 +82,7 @@ async function stop(){await nodes.get('stopRecording').click();await flush(8);}
   assert.equal(pastes.length,0);
   context.releaseFinish();finishGate=null;await stopping;await flush(10);
   assert.equal(count('/api/transcribe'),0);
+  assert.equal(preview.hidden,true);
   assert.equal(pastes.length,1);
   assert.equal(pastes[0].english,inlineQuick?'I want to redesign the page':'Redesign the home page.');
   assert.ok(!pastes[0].english.includes('عايز'));

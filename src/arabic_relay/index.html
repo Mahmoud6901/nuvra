@@ -140,7 +140,7 @@ const RELAY_EN={
  "ثبّت التحديثات لما أقفل البرنامج":"Install updates when I quit the app",
  "متقدم":"Advanced",
  "حوّل الكلام وأنا بتكلم":"Transcribe while I speak",
- "مع Whisper بس. النص بيخلص أسرع بعد ما توقف. شغال تلقائي مع كارت NVIDIA، ومقفول على المعالج لأن النماذج الكبيرة مش بتلحق. الصوت بيفضل في الذاكرة على جهازك.":"Whisper only. The text finishes faster after you stop. On automatically with an NVIDIA graphics card, and off on the CPU because large models can't keep up. The audio stays in memory on this computer.",
+ "مع Whisper، الكلام بيظهر في شريط التسجيل وإنت بتتكلم، وممكن يتغير لحد ما توقف. الإعداد شغال تلقائي مع كارت NVIDIA ومقفول تلقائي على المعالج. الصوت بيفضل في الذاكرة على جهازك.":"With Whisper, the recording popup shows draft words as you speak. They can change until you stop. This is on by default with an NVIDIA graphics card and off by default on CPU. Audio stays in memory on this computer.",
  "لغة الكلام في Whisper":"Whisper speech language",
  "اختار لغة التسجيل.":"Choose the speech language.",
  "تلقائي (عربي أو إنجليزي)":"Automatic (Arabic or English)",
@@ -686,7 +686,7 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
   <section class="group"><h2>الشكل</h2><button class="btn" id="themeToggle" aria-label="غيّر للوضع الفاتح"><svg aria-hidden="true" focusable="false"><use href="#i-sun"/></svg><span>الوضع الفاتح</span></button></section>
   <section class="group" id="aboutSettings"><h2>التحديثات</h2><p id="appVersion">Nuvra</p><div class="setting"><label for="updateMode">طريقة التحديث</label><select id="updateMode"><option value="auto">تلقائي</option><option value="notify">تنبيه بس</option><option value="off">إيقاف</option></select></div><label class="choice"><input id="installOnQuit" type="checkbox" checked>ثبّت التحديثات لما أقفل البرنامج</label></section>
   <details class="group" id="advancedSettings"><summary>متقدم</summary>
-   <div class="setting-block" id="incrementalSettings"><label class="choice"><input id="incrementalDictation" type="checkbox" disabled aria-describedby="incrementalHelp">حوّل الكلام وأنا بتكلم</label><p class="group-help" id="incrementalHelp">مع Whisper بس. النص بيخلص أسرع بعد ما توقف. شغال تلقائي مع كارت NVIDIA، ومقفول على المعالج لأن النماذج الكبيرة مش بتلحق. الصوت بيفضل في الذاكرة على جهازك.</p></div>
+   <div class="setting-block" id="incrementalSettings"><label class="choice"><input id="incrementalDictation" type="checkbox" disabled aria-describedby="incrementalHelp">حوّل الكلام وأنا بتكلم</label><p class="group-help" id="incrementalHelp">مع Whisper، الكلام بيظهر في شريط التسجيل وإنت بتتكلم، وممكن يتغير لحد ما توقف. الإعداد شغال تلقائي مع كارت NVIDIA ومقفول تلقائي على المعالج. الصوت بيفضل في الذاكرة على جهازك.</p></div>
    <div class="setting-block" id="engineSettings"><div class="setting"><label for="spokenLanguage">لغة الكلام في Whisper</label><select id="spokenLanguage"><option value="auto">تلقائي (عربي أو إنجليزي)</option><option value="ar">عربي (ممكن تستخدم أسماء إنجليزي)</option><option value="en">إنجليزي</option></select></div>
    <div class="setting"><label for="engineIdle">سيب نموذج الكلام في الذاكرة</label><select id="engineIdle" aria-describedby="engineHelp"><option value="300">5 دقايق بعد آخر تسجيل</option><option value="900">15 دقيقة</option><option value="3600">ساعة</option><option value="0">لحد ما أقفل البرنامج</option></select></div><label class="choice"><input id="enginePrewarm" type="checkbox">جهّز النموذج أول ما البرنامج يفتح</label><label class="choice"><input id="cpuOnly" type="checkbox">استخدم المعالج دايمًا</label><p class="group-help" id="engineHelp">لما النموذج يخرج من الذاكرة، أول تسجيل بعدها بياخد كام ثانية زيادة.</p><p class="group-help" id="gpuBackoff" role="status" hidden></p><button class="btn" id="retryGpu" hidden>جرّب كارت الشاشة تاني</button></div>
    <div class="setting-block"><label for="vocabulary">كلمات عايز النموذج يسمعها صح (اختياري)</label><input class="field" id="vocabulary" maxlength="3000" dir="auto" placeholder="React، أسماء مشاريع، كلمات تقنية…"><div class="vocabulary-meta"><span id="vocabularyStatus" role="status"></span><button class="text-btn" id="viewVocabulary">شوف الكلمات المحفوظة</button></div></div>
@@ -1172,9 +1172,9 @@ async function aliasAction(path,body){
 }
 function showProvisional(text){
  const value=(text||'').trim();$('provisionalText').hidden=!value;$('provisionalText').textContent=value?'Provisional · '+value:'';
- if(quickCapture&&dictationProvider==='gemini')showLiveText(value);
+ if(quickCapture)showLiveText(value);
 }
-// The words Gemini hears, in the shortcut pill. A message already on the pill stays.
+// Show the current draft in the shortcut pill without displacing a status message.
 function showLiveText(value){
  $('captureLive').textContent=value;$('captureLive').hidden=!value;
  const at=document.documentElement.dataset.captureStage;

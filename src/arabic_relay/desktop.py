@@ -23,7 +23,7 @@ if sys.platform == 'darwin':
     from .macos import RecordingHotkey, CaptureHotkeys
 
 
-# Logical pixels; the page's pill fills the window exactly. 'live' shows the words Gemini hears as they come; 'guide'
+# Logical pixels; the page's pill fills the window exactly. 'live' shows the current draft transcript; 'guide'
 # says how to dictate with Granola.
 PILL = {'capture': (147, 40), 'message': (400, 60), 'live': (420, 60), 'guide': (300, 40)}
 FRAME = 0 if sys.platform == 'darwin' else 16  # WinForms frameless window adjustment
