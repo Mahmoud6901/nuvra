@@ -145,6 +145,31 @@ def spoken():
 
 
 class Jobs(unittest.TestCase):
+    def test_early_gpu_draft_never_confirms_words_or_sets_the_language(self):
+        headers = []
+
+        def recognize(header, payload, cancel_event):
+            headers.append(header)
+            if header.get('overrides', {}).get('word_timestamps') is False:
+                return {'text': 'unfinished', 'effectiveAsrConfig': {'detectedLanguage': 'en'}}
+            return {'segments': [{'text': ' سلام', 'words': [word('سلام', 0, .4)]}]}
+
+        job = incremental.Job('early-draft', True, [], ('model', 'cuda'), recognize,
+                              decode_header={'overrides': {'language': 'ar', 'multilingual': False}})
+        self.addCleanup(job.cancel)
+        samples = int(incremental.PREVIEW_AT * RATE)
+        job.append(0, b'\x00\x02' * samples)
+        with job.condition:
+            self.assertTrue(job.condition.wait_for(lambda: job.provisional == 'unfinished', 3))
+        self.assertFalse(job.windows)
+        self.assertIsNone(job.language)
+        result, reason = job.finish(samples, 0, timeout=3)
+        self.assertIsNone(reason)
+        self.assertEqual(result['text'], 'سلام')
+        self.assertEqual([h['overrides'] for h in headers],
+                         [{'language': 'ar', 'multilingual': False, 'word_timestamps': False},
+                          {'language': 'ar', 'multilingual': False}])
+
     def test_passes_while_recording_confirm_the_spoken_words_and_stop_needs_no_decode(self):
         audio = scripted_audio()
         recognizer = FakeRecognizer(audio)

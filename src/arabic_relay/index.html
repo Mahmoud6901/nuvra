@@ -3,6 +3,7 @@
 <script>
 try{document.documentElement.dataset.theme=localStorage.getItem('relay-theme')==='light'?'light':'dark';}catch{document.documentElement.dataset.theme='dark';}
 document.documentElement.dataset.quick=String(window.location?.search==='?quick=1');
+if(document.documentElement.dataset.quick==='true')document.documentElement.dataset.captureStage='live';
 </script>
 <script>
 // The interface language. Arabic is the source text, so it needs no table; English looks each string up here.
@@ -585,7 +586,7 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
 :root[data-pill=flow] #captureText{flex:1;min-width:0}:root[data-pill=flow] #captureLabel{position:static;display:block;width:auto;height:auto;clip-path:none;color:#fff;font-size:12px;text-align:center}
 #flowCapture{position:absolute;width:1px;height:1px;padding:0;border:0;outline:0;resize:none;overflow:hidden;background:transparent;color:transparent;opacity:0}
 /* Granola pastes into the focused field it finds, so here the field is as large as the pill; its text stays unseen. */
-:root[data-capture-stage=guide] #flowCapture{inset:0;width:100%;height:100%;opacity:1;caret-color:transparent;pointer-events:none}
+:root[data-capture-stage=live][data-pill=flow] #flowCapture{inset:0;width:100%;height:100%;opacity:1;caret-color:transparent;pointer-events:none}
 #captureLiveBox{display:none}
 /* In the expanded pill the transcript leads; keep the two actions together at its right edge. */
 :root[data-capture-stage=live] #capturePill{
@@ -604,6 +605,11 @@ dialog p{margin-bottom:10px;color:var(--muted);font-size:14px}
 }
 #captureLive{flex:none;overflow-wrap:anywhere;text-align:start;color:#f5f5f5;font:450 15px/24px var(--sans)}
 :root[data-capture-stage=live] #captureText{position:absolute;width:1px;height:1px;overflow:hidden}
+:root[data-capture-stage=live] #capturePill:has(#captureLive[hidden]) #captureText{position:static;grid-area:1/2;width:auto;height:auto;margin:0 6px 0 8px}
+:root[data-capture-stage=live] #capturePill:has(#captureLive[hidden]) #captureLabel{position:static;display:block;width:auto;height:auto;clip-path:none;color:#c5c7c9;font:450 15px/24px var(--sans)}
+:root[data-capture-stage=live][data-pill=flow] #capturePill{grid-template-columns:minmax(0,1fr) 32px}
+:root[data-capture-stage=live][data-pill=flow] #capturePill:has(#captureLive[hidden]) #captureText{grid-area:1/1}
+:root[data-capture-stage=live][data-pill=flow] #capturePill #captureClose{grid-area:1/2}
 :root[data-capture-stage=live] .pill-btn{width:32px;height:32px}
 :root[data-capture-stage=live] #captureClose{grid-area:1/3;background:transparent;color:#c5c7c9}
 :root[data-capture-stage=live] #captureClose:hover:enabled{background:rgba(255,255,255,.09);color:#fff}
@@ -755,7 +761,6 @@ const quickCapture=window.location?.search==='?quick=1';
 document.documentElement.dataset.quick=String(quickCapture);
 let quickTimer=null,quickComposing=false,quickFailure=false,quickFlowCapturing=false,quickNativeStage='',quickEnding=false,quickCloseTimer=null,quickMessage='',pasteAvailable=false,inlineStarting=false,noticeTimer=null,levelStop=null;
 const QUICK_MESSAGE_MS=4000,NOTICE_MS=4000;
-if(quickCapture)document.documentElement.dataset.captureStage='capture';
 let dictationProvider='whisper',wisprFlowInstalled=false,cohereConfigured=false,geminiConfigured=false,granolaInstalled=false,granolaRunning=null,platform='',selfLearningEnabled=null,speechLearning=null,autoSpellingEnabled=null,localTranslatorState=null;
 const PROVIDERS=['whisper','wispr','cohere','gemini','granola'];
 function savedProvider(){try{const saved=localStorage.getItem('relay-dictation-provider');return PROVIDERS.includes(saved)?saved:'whisper';}catch{return 'whisper';}}
@@ -1109,7 +1114,7 @@ function cancelSpeechPreparation(){
  const prepared=speechPreparation;speechPreparation=null;
  if(prepared)prepared.ready.then(()=>api('/api/speech/cancel-prepare',{requestId:prepared.requestId})).catch(()=>{});
 }
-// Processing during speech: 16 kHz PCM from the same microphone stream, sent in order as 1-second chunks.
+// Processing during speech: ordered 100 ms frames from the same 16 kHz microphone stream.
 // Provisional text is display-only. Any local failure falls back to the existing whole-recording upload; a Gemini failure
 // never uploads by itself, so the recording waits for Retry.
 // A stage is what the app is doing and for how long, never an invented percentage.
@@ -1177,15 +1182,13 @@ function showProvisional(text){
 // Show the current draft in the shortcut pill without displacing a status message.
 function showLiveText(value){
  $('captureLive').textContent=value;$('captureLive').hidden=!value;
- const at=document.documentElement.dataset.captureStage;
- if(value&&at==='capture')setPillStage('live');else if(!value&&at==='live')setPillStage('capture');
 }
 // Upload faults are English details for the log; the pill names the service and what to do.
 function onlineReason(message){return !message||/^(Audio upload|Processing during|Recorded audio|No audio|This recording|Failed to fetch|NetworkError)/.test(message)?tr('Gemini ما قدرش يكمّل. راجع النت وجرّب تاني.'):message;}
 async function openLiveCapture(stream){
  const online=dictationProvider==='gemini';
  if(!online&&(!incrementalEnabled||dictationProvider!=='whisper')||!window.AudioWorkletNode||!window.AudioContext)return null;
- const live={online,chunk:online?ONLINE_CHUNK:LIVE_CHUNK,queueLimit:online?ONLINE_QUEUE:LIVE_QUEUE,jobId:crypto.randomUUID(),seq:0,queue:[],pending:[],pendingSamples:0,samples:0,sentSamples:0,sending:false,accepted:null,failed:null,cancelled:false,flushed:null,waiters:[]};
+ const live={online,jobId:crypto.randomUUID(),seq:0,queue:[],samples:0,sentSamples:0,sending:false,accepted:null,failed:null,cancelled:false,flushed:null,waiters:[]};
  try{
   live.ctx=new AudioContext({sampleRate:16000});
   if(live.ctx.sampleRate!==16000)throw new Error('16 kHz capture is unavailable');
@@ -1202,22 +1205,15 @@ async function openLiveCapture(stream){
 function startLiveJob(live){
  live.accepted=api('/api/stream/start',{jobId:live.jobId,inline:inlineMode(),vocabulary:$('vocabulary').value,...(live.online?{provider:'gemini'}:{})}).then(r=>{if(!r.accepted)throw new Error('Processing during speech is unavailable ('+(r.reason||'busy')+').');live.ok=true;pumpLive(live);return true;}).catch(e=>{failLiveStream(live,e.message,false);return false;});
 }
-// A quarter second per upload: each pass during speech sees new audio sooner. Fifteen seconds may queue.
-// Gemini gets a tenth of a second at a time, so its words show sooner.
-const LIVE_CHUNK=4000,LIVE_QUEUE=60,ONLINE_CHUNK=1600,ONLINE_QUEUE=150;
+// Forward each 100 ms worklet frame promptly; at most fifteen seconds may queue.
+const LIVE_QUEUE=150;
 function livePcm(live,data){
  if(live.failed||live.cancelled)return;
  if(data.type==='flushed'){live.flushed?.();return;}
  if(data.type!=='pcm')return;
  if(!live.samples)stageTimes.firstAudio=clock();
- live.pending.push(data.samples);live.pendingSamples+=data.samples.length;live.samples+=data.samples.length;
- if(live.pendingSamples>=live.chunk)queueLiveChunk(live);
-}
-function queueLiveChunk(live){
- if(!live.pendingSamples)return;
- const chunk=new Int16Array(live.pendingSamples);let offset=0;for(const part of live.pending){chunk.set(part,offset);offset+=part.length;}
- live.pending=[];live.pendingSamples=0;live.queue.push(chunk);
- if(live.queue.length>live.queueLimit){failLiveStream(live,'Audio upload fell behind.');return;}
+ live.samples+=data.samples.length;live.queue.push(data.samples);
+ if(live.queue.length>LIVE_QUEUE){failLiveStream(live,'Audio upload fell behind.');return;}
  pumpLive(live);
 }
 async function pumpLive(live){
@@ -1237,7 +1233,7 @@ function closeLiveCapture(live){
  live.node=null;live.source=null;
 }
 function failLiveStream(live,reason,cancelServer=true){
- if(live.failed)return;live.failed=reason||'stopped';live.queue=[];live.pending=[];closeLiveCapture(live);
+ if(live.failed)return;live.failed=reason||'stopped';live.queue=[];closeLiveCapture(live);
  for(const resolve of live.waiters.splice(0))resolve();
  if(cancelServer&&live.ok)api('/api/stream/cancel',{jobId:live.jobId}).catch(()=>{});
  if(liveStream!==live)return;
@@ -1249,7 +1245,7 @@ function cancelLiveStream(){const live=liveStream;liveStream=null;if(live){live.
 async function finishLiveStream(live){
  if(!await live.accepted||live.failed)throw new Error(live.failed||'Processing during speech stopped.');
  if(live.node){await new Promise(resolve=>{live.flushed=resolve;live.node.port.postMessage('flush');setTimeout(resolve,1000);});}
- closeLiveCapture(live);queueLiveChunk(live);
+ closeLiveCapture(live);
  await new Promise(resolve=>{live.waiters.push(resolve);pumpLive(live);setTimeout(resolve,20000);});
  if(live.failed||live.queue.length||live.sending)throw new Error(live.failed||'Audio upload did not finish.');
  if(live.sentSamples!==live.samples)throw new Error('Recorded audio was incomplete.');
@@ -1562,11 +1558,11 @@ window.relayQuickToggle=async()=>{
  if(dictationProvider==='granola'||dictationProvider==='gemini'&&!geminiConfigured)await api('/api/status').then(readProviders).catch(()=>{});
  clearTimeout(quickCloseTimer);quickCloseTimer=null;
  $('clearDraft').click();
- quickEnding=false;quickFailure=false;quickMessage='';quickFlowCapturing=false;$('captureRetry').hidden=true;setPillStage('capture');
+ quickEnding=false;quickFailure=false;quickMessage='';quickFlowCapturing=false;$('captureRetry').hidden=true;setPillStage('live');
  await beginPasteCapture();
  const trouble=dictationProvider==='granola'?granolaProblem():'';
  if(trouble){notice(trouble);window.pywebview?.api.show_main?.('models',csrf)?.catch?.(()=>{});return;}
- if(flowProvider()){if(dictationProvider==='granola')setPillStage('guide');quickFlowCapturing=true;$('flowCapture').value='';updateQuickSurface();await Promise.resolve(window.pywebview?.api.quick_keyboard?.(csrf)).catch(()=>{});$('flowCapture').focus();return;}
+ if(flowProvider()){quickFlowCapturing=true;$('flowCapture').value='';updateQuickSurface();await Promise.resolve(window.pywebview?.api.quick_keyboard?.(csrf)).catch(()=>{});$('flowCapture').focus();return;}
  await $('record').click();
 };
 function setPillStage(stage){document.documentElement.dataset.captureStage=stage;if(window.pywebview?.api.quick_stage&&csrf&&quickNativeStage!==stage){quickNativeStage=stage;window.pywebview.api.quick_stage(stage,csrf).catch(()=>{quickNativeStage='';});}}
@@ -1600,7 +1596,6 @@ function updateQuickSurface(){
 function receiveFlowText(event){
  if(!quickCapture||!flowProvider()||busy)return;
  quickFlowCapturing=false;pasteInputReceived=!!$('flowCapture').value.trim();
- if(pasteInputReceived&&document.documentElement.dataset.captureStage==='guide')setPillStage('capture');
  const target=inlineMode()?$('english'):$('arabic');
  target.value=$('flowCapture').value;target.dispatchEvent(new Event('input'));
  // Flow pastes a finished transcript; only incremental typing/composition needs the pause.
@@ -1627,7 +1622,7 @@ function quickKeydown(event){
  else window.pywebview?.api.close_quick?.(csrf);
 }
 document.addEventListener('keydown',quickKeydown);
-$('captureRetry').addEventListener('click',()=>{clearTimeout(quickCloseTimer);quickCloseTimer=null;quickEnding=false;quickFailure=false;quickMessage='';$('captureRetry').hidden=true;setPillStage('capture');transcribeRecording();});
+$('captureRetry').addEventListener('click',()=>{clearTimeout(quickCloseTimer);quickCloseTimer=null;quickEnding=false;quickFailure=false;quickMessage='';$('captureRetry').hidden=true;setPillStage('live');transcribeRecording();});
 $('captureClose').addEventListener('click',()=>window.pywebview?.api.close_quick?.(csrf));
 let confirmation=null;
 function askConfirm(title,description,action){

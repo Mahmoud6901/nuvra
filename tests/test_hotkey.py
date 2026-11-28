@@ -103,9 +103,11 @@ class Shortcut(unittest.TestCase):
             capture.toggle()
             capture.toggle()  # second press during initial loading does not duplicate
             create.assert_called_once()
-            self.assertEqual(create.call_args.kwargs['height'], 56)
+            self.assertEqual(capture.stage, 'live')
+            self.assertEqual(create.call_args.kwargs['width'], 420 + desktop.FRAME)
+            self.assertEqual(create.call_args.kwargs['height'], 60 + desktop.FRAME)
             self.assertEqual(create.call_args.kwargs['min_size'], (120, 40))
-            self.assertEqual(create.call_args.kwargs['y'], 490)
+            self.assertEqual(create.call_args.kwargs['y'], 470)
             self.assertTrue(create.call_args.kwargs['frameless'])
             self.assertFalse(create.call_args.kwargs['focus'])    # the user's app keeps the keyboard
             self.assertIsNone(window.native.Activate())           # pywebview would otherwise activate it anyway

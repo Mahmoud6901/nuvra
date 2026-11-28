@@ -67,6 +67,8 @@ async function stop(){await nodes.get('stopRecording').click();await flush(8);}
  if(quickMode){
   // Shortcut capture: provisional text never reaches the paste path; the final prompt pastes exactly once.
   await record();
+  assert.equal(context.document.documentElement.dataset.captureStage,'live','Transcript layout is visible before the first PCM frame');
+  assert.ok(!stages.includes('capture'));
   workletNodes.at(-1).emit(new Int16Array(16000));await flush();
   const preview=nodes.get('captureLive');
   assert.ok(preview.textContent.includes('redesign'));
@@ -110,9 +112,9 @@ async function stop(){await nodes.get('stopRecording').click();await flush(8);}
  assert.equal(JSON.parse(requests.find(r=>r.url==='/api/stream/start').options.body).inline,false);
  node.emit(new Int16Array(1600));node.emit(new Int16Array(1600));node.emit(new Int16Array(1600));node.emit(new Int16Array(4000));await flush();
  const chunks=requests.filter(r=>r.url==='/api/stream/chunk');
- assert.deepEqual(chunks.map(r=>r.options.headers['X-Relay-Stream-Seq']),['0','1']);
+ assert.deepEqual(chunks.map(r=>r.options.headers['X-Relay-Stream-Seq']),['0','1','2','3']);
  assert.ok(chunks.every(r=>r.options.headers['Content-Type']==='application/octet-stream'&&true));
- assert.deepEqual(chunks.map(r=>r.options.body.length),[4800,4000]);   // 100 ms frames batched to a quarter second
+ assert.deepEqual(chunks.map(r=>r.options.body.length),[1600,1600,1600,4000]);   // each frame is sent immediately
  assert.equal(nodes.get('provisionalText').hidden,false);
  assert.ok(nodes.get('provisionalText').textContent.startsWith('Provisional'));
  assert.equal(nodes.get('arabic').value,'');   // provisional text never enters the editable source
@@ -120,7 +122,7 @@ async function stop(){await nodes.get('stopRecording').click();await flush(8);}
  await stop();
  assert.ok(node.messages.includes('flush'));
  const finish=JSON.parse(requests.find(r=>r.url==='/api/stream/finish').options.body);
- assert.deepEqual([finish.lastSeq,finish.totalSamples],[2,12800]);
+ assert.deepEqual([finish.lastSeq,finish.totalSamples],[4,12800]);
  assert.equal(count('/api/transcribe'),0);
  assert.equal(nodes.get('arabic').value,'عايز أعمل redesign للصفحة');
  assert.equal(nodes.get('provisionalText').hidden,true);

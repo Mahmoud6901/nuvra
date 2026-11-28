@@ -23,9 +23,8 @@ if sys.platform == 'darwin':
     from .macos import RecordingHotkey, CaptureHotkeys
 
 
-# Logical pixels; the page's pill fills the window exactly. 'live' shows the current draft transcript; 'guide'
-# says how to dictate with Granola.
-PILL = {'capture': (147, 40), 'message': (400, 60), 'live': (420, 60), 'guide': (300, 40)}
+# Logical pixels. The recording window opens at its transcript size, including before any words arrive.
+PILL = {'message': (400, 60), 'live': (420, 60)}
 FRAME = 0 if sys.platform == 'darwin' else 16  # WinForms frameless window adjustment
 HISTORY_KEPT = 'اتنسخ، ما اتلصقش'
 
@@ -164,7 +163,7 @@ class QuickCapture:
         self.ready = False
         self.exiting = False
         self.allow_close = False
-        self.stage = 'capture'
+        self.stage = 'live'
         self.lock = threading.Lock()
         self.paster = paste.Paster()
         self.target = None
@@ -190,8 +189,9 @@ class QuickCapture:
                 scale = 1 if sys.platform == 'darwin' else ctypes.windll.user32.GetDpiForSystem() / 96
                 screen_width, screen_height = int(screen.width / scale), int(screen.height / scale)
                 self.screen_bounds = (int(screen.x / scale), int(screen.y / scale), screen_width, screen_height)
-                self.stage = 'capture'
-                width, height = PILL['capture']
+                self.stage = 'live'
+                width, height = PILL[self.stage]
+                width = min(width, screen_width - 40)
                 self.window = webview.create_window(
                     'Nuvra', server.ORIGIN + '/?quick=1',
                     js_api=DesktopApi(self, quick=True), width=width + FRAME, height=height + FRAME,

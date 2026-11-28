@@ -23,7 +23,8 @@ RATE = 16000
 MAX_SECONDS = 300
 MAX_SAMPLES = MAX_SECONDS * RATE
 MAX_CHUNK = 2 * RATE                 # samples per transport chunk
-FIRST_PASS = 1.0                     # seconds of audio before the first pass
+PREVIEW_AT = 0.4                     # a short display-only pass on GPU while the opening word arrives
+FIRST_PASS = 1.0                     # first pass allowed to contribute words or language to the final reading
 STEP = 0.5                           # new audio a later pass waits for
 KEEP = 5.0                           # a trimmed buffer still holds this much recent audio (context, language detection)
 TRIM_AT = 10.0                       # the unconfirmed buffer is trimmed at a confirmed pause once longer than this
@@ -244,6 +245,7 @@ class Job:
         self.cancelled = threading.Event()
         self.stopped_reason = None         # why processing during speech stopped early
         self.provisional = ''
+        self.next_preview = int(PREVIEW_AT * RATE)
         self.condition = threading.Condition()
         self.created = self.touched = time.monotonic()
         self.times = {'start': self.created}
@@ -295,6 +297,8 @@ class Job:
 
     def due(self, available):
         """Whether the next pass during recording should start: enough new audio, and some of it is speech."""
+        if self.key[1] == 'cuda' and not self.windows and self.next_preview <= available < FIRST_PASS * RATE:
+            return not self.provisional and not silent(self.read(0, available), 0)
         needed = (STEP if self.windows else FIRST_PASS) * RATE
         if available - max(self.decoded_to, self.buffer_start) < needed:
             return False
@@ -311,6 +315,9 @@ class Job:
                         break
                     self.condition.wait(.25)
                 final = self.closed
+                preview_only = not final and available < FIRST_PASS * RATE and not self.windows
+                if preview_only:
+                    self.next_preview = available + int(PREVIEW_AT * RATE)
                 if available - self.buffer_start > BUFFER_CAP * RATE:
                     # Passes cannot keep up or never agree: Stop decodes the whole recording instead.
                     self.stop_partials('backlog')
@@ -329,11 +336,15 @@ class Job:
                 payload = bytes(self.pcm[start * 2:end * 2])
                 header = {'format': 'pcm16', 'window': True, 'inline': self.inline, 'keywords': self.keywords, **self.decode_header,
                           'context': self.context(), **({'language': self.language} if self.language else {})}
+                if preview_only:
+                    header['overrides'] = {**header.get('overrides', {}), 'word_timestamps': False}
             index = len(self.windows)
             started = time.monotonic()
             try:
                 result = self.transcriber(header, payload, self.cancelled)
             except Exception as error:
+                if preview_only:
+                    continue   # a speculative preview must not disable the regular passes
                 with self.condition:
                     self.stop_partials('failed: ' + getattr(error, 'code', type(error).__name__))
                     self.condition.notify_all()
@@ -344,6 +355,14 @@ class Job:
                 if self.cancelled.is_set():
                     return                # results of a cancelled job are invalid
                 self.inference_ms.append(round((time.monotonic() - started) * 1000))
+                if preview_only:
+                    # A fraction of a word cannot decide the recording's language or confirm words.
+                    if not self.closed:
+                        self.provisional = (result.get('text') or '').strip()
+                        if self.provisional:
+                            self.times.setdefault('firstPartial', time.monotonic())
+                        self.condition.notify_all()
+                    continue
                 window = {'index': index, 'start': start, 'end': end, 'result': result}
                 try:
                     words = window_words(window)
@@ -371,7 +390,8 @@ class Job:
                 if cut is not None:
                     self.buffer_start = min(end, max(self.buffer_start, int(cut * RATE)))
                 self.provisional = assemble(self.agreement.committed + self.agreement.tentative)[0]
-                self.times.setdefault('firstPartial', time.monotonic())
+                if self.provisional:
+                    self.times.setdefault('firstPartial', time.monotonic())
                 self.condition.notify_all()
 
     def on_gpu(self):

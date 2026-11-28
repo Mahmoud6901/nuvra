@@ -86,11 +86,11 @@ def segment_rows(segments):
 
 
 OVERRIDES = {'beam_size': (1, 10), 'language': None, 'multilingual': None, 'vad_filter': None,
-             'vad_parameters': None, 'condition_on_previous_text': None}
+             'vad_parameters': None, 'condition_on_previous_text': None, 'word_timestamps': None}
 
 
 def checked_overrides(overrides):
-    """Measurement-only decoding choices, strictly bounded; anything unknown is refused."""
+    """Bounded per-request decoding choices; anything unknown is refused."""
     if overrides in (None, {}):
         return {}
     if not isinstance(overrides, dict) or not set(overrides) <= set(OVERRIDES):
@@ -103,7 +103,7 @@ def checked_overrides(overrides):
         elif key == 'language':
             if value is not None and (not isinstance(value, str) or not 2 <= len(value) <= 3):
                 raise ValueError('INVALID_REQUEST')
-        elif key in ('multilingual', 'vad_filter', 'condition_on_previous_text'):
+        elif key in ('multilingual', 'vad_filter', 'condition_on_previous_text', 'word_timestamps'):
             if type(value) is not bool:
                 raise ValueError('INVALID_REQUEST')
         elif key == 'vad_parameters':
@@ -143,7 +143,7 @@ def decode(model, samples, device, keywords, check=False, inline_mode=False, ret
     if inline_mode or window:
         if inline_mode and not model.model.is_multilingual:
             raise ValueError('MULTILINGUAL_REQUIRED')
-        options.update(word_timestamps=True)
+        options.setdefault('word_timestamps', True)
         if inline_mode:
             options.update(vad_filter=not retry, condition_on_previous_text=retry, initial_prompt=arabic_hints)
         if window and context:
@@ -153,7 +153,7 @@ def decode(model, samples, device, keywords, check=False, inline_mode=False, ret
         config = {'runtime': 'faster-whisper 1.2.1', 'task': 'transcribe', 'multilingual': options['multilingual'],
                   'detectedLanguage': detector.first_language if detector and options['multilingual'] else getattr(info, 'language', None),
                   'path': 'window' if window else 'serial',
-                  'wordTimestamps': True, 'sampleRate': 16000, 'beamSize': 5, 'vad': options['vad_filter'],
+                  'wordTimestamps': options['word_timestamps'], 'sampleRate': 16000, 'beamSize': 5, 'vad': options['vad_filter'],
                   'conditionOnPreviousText': options['condition_on_previous_text'],
                   'device': device, 'computeType': compute_type(device)}
         return {'text': ''.join(row['text'] for row in rows), 'segments': rows,
